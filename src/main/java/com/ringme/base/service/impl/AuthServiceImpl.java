@@ -3,9 +3,11 @@ package com.ringme.base.service.impl;
 import com.ringme.base.dto.app.request.LoginRequest;
 import com.ringme.base.dto.app.request.RefreshTokenRequest;
 import com.ringme.base.dto.app.response.GetTokensResponse;
+import com.ringme.base.entity.AppUser;
 import com.ringme.base.enums.AppCode;
 import com.ringme.base.enums.TokenType;
 import com.ringme.base.exception.BusinessLogicException;
+import com.ringme.base.repository.AppUserRepository;
 import com.ringme.base.security.JwtProcessor;
 import com.ringme.base.service.AuthService;
 import io.jsonwebtoken.Claims;
@@ -13,8 +15,10 @@ import io.jsonwebtoken.JwtException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -27,6 +31,8 @@ public class AuthServiceImpl implements AuthService {
     public static final String ROLES_CLAIM = "roles";
 
     private final JwtProcessor jwtProcessor;
+    private final AppUserRepository appUserRepository;
+    private final PasswordEncoder passwordEncoder;
 
     /**
      * Khung xử lý đăng nhập. Cấp cặp token sau khi thông tin đăng nhập được xác thực. Mặc định
@@ -79,13 +85,23 @@ public class AuthServiceImpl implements AuthService {
     }
 
     /**
-     * Kiểm tra thông tin đăng nhập — CHƯA ĐƯỢC CÀI ĐẶT trong base mẫu. Hãy thay bằng logic xác
-     * thực thật dựa trên kho người dùng của bạn và trả về danh sách vai trò của người dùng đã
-     * xác thực (ví dụ {@code List.of("USER")}). Khi chưa cài đặt, mọi lượt đăng nhập đều bị từ chối với mã 401.
+     * Kiểm tra thông tin đăng nhập dựa trên bảng {@code dev_e_commerce.app_user}: so khớp password
+     * đã hash (BCrypt) và trả về danh sách role của user để đưa vào claim "roles" của JWT.
      */
     private List<String> authenticateCredentials(LoginRequest request) {
-        log.warn("Lượt đăng nhập của '{}' bị từ chối: authenticateCredentials() chưa được cài đặt",
-                request.getUsername());
-        throw new BusinessLogicException(AppCode.CODE_401, "Authentication is not configured");
+        AppUser user = appUserRepository.findByUsername(request.getUsername())
+                .filter(AppUser::getEnabled)
+                .orElseThrow(() -> {
+                    log.warn("Lượt đăng nhập của '{}' bị từ chối: user không tồn tại hoặc bị khóa",
+                            request.getUsername());
+                    return new BusinessLogicException(AppCode.CODE_401, "Invalid username or password");
+                });
+
+        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+            log.warn("Lượt đăng nhập của '{}' bị từ chối: sai password", request.getUsername());
+            throw new BusinessLogicException(AppCode.CODE_401, "Invalid username or password");
+        }
+
+        return new ArrayList<>(user.getRoles());
     }
 }

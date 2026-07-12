@@ -299,7 +299,7 @@
                     <!-- Test dùng @SpringBootTest nên KHÔNG chạy qua main(); phải khai báo
                          spring.config.name ở đây để import thư mục profiles/<profile>/ nạp đủ file. -->
                     <systemPropertyVariables>
-                        <spring.config.name>application,server,web,security,redis,http-client,cache,observability,resilience,mysql,mongodb,rabbitmq,kafka</spring.config.name>
+                        <spring.config.name>application,server,web,security,redis,http-client,cache,observability,resilience,mysql,mongodb,rabbitmq,kafka,oracle</spring.config.name>
                     </systemPropertyVariables>
                 </configuration>
             </plugin>

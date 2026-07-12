@@ -17,7 +17,7 @@ public class BaseApplication {
         // Phải đồng bộ với systemPropertyVariables của maven-surefire trong pom.xml.
         app.setDefaultProperties(Map.of(
                 "spring.config.name",
-                "application,server,web,security,redis,http-client,cache,observability,resilience,mysql,mongodb,rabbitmq,kafka"));
+                "application,server,web,security,redis,http-client,cache,observability,resilience,mysql,mongodb,rabbitmq,kafka,oracle"));
         app.run(args);
     }
 

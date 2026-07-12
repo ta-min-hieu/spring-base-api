@@ -1,0 +1,26 @@
+# ============================== Oracle (JPA Hibernate) — dùng cho dev ==============================
+# Thay MySQL: dev connect vào Oracle XE chạy trong Docker (schema dev_e_commerce chứa app_user/app_user_role).
+spring:
+  datasource:
+    url: ${DB_DWH_URL:jdbc:oracle:thin:@localhost:1521/XE}
+    username: ${DB_DWH_USERNAME:dev}
+    password: ${DB_DWH_PASSWORD:Hieu123456789a}
+    driver-class-name: oracle.jdbc.OracleDriver
+    hikari:
+      connectionTimeout: 30000
+      idleTimeout: 30000
+      maxLifetime: 2000000
+      maximumPoolSize: 100
+      minimumIdle: 5
+      poolName: HikariCP
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: none
+    database-platform: org.hibernate.dialect.OracleDialect
+    show-sql: false
+
+management:
+  health:
+    db:
+      enabled: true
