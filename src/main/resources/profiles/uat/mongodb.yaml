@@ -1,0 +1,33 @@
+# ============================== MongoDB — OPT-IN, mặc định TẮT ==============================
+# Auto-config của Spring Boot tạo MongoClient + MongoTemplate; client kết nối LƯỜI (không kết nối lúc khởi động),
+# nên base vẫn chạy/test được khi chưa có MongoDB. Health indicator gate theo cờ để /actuator/health UP khi TẮT.
+#
+# CÁCH BẬT: MONGODB_ENABLED=true + cung cấp MONGODB_URI (hoặc khai báo rời host/port/database/credentials).
+#
+# LƯU Ý (Spring Boot 4): properties kết nối Mongo đã ĐỔI prefix từ `spring.data.mongodb.*` -> `spring.mongodb.*`
+# (auto-config Mongo tách khỏi namespace "data", về module spring-boot-mongodb). Dùng `spring.mongodb.*`.
+spring:
+  mongodb:
+    uri: ${MONGODB_URI:mongodb://localhost:27017/base}
+    # --- Hoặc khai báo RỜI thay cho uri (bỏ comment nếu dùng) ---
+    # host: ${MONGODB_HOST:localhost}
+    # port: ${MONGODB_PORT:27017}
+    # database: ${MONGODB_DATABASE:base}
+    # username: ${MONGODB_USERNAME:}
+    # password: ${MONGODB_PASSWORD:}
+    # authentication-database: ${MONGODB_AUTH_DB:admin}
+    auto-index-creation: ${MONGODB_AUTO_INDEX:false}   # tự tạo index từ annotation @Indexed (tắt ở prod, quản index thủ công)
+
+# Health indicator MongoDB chỉ BẬT khi Mongo bật (giữ /actuator/health UP khi TẮT).
+management:
+  health:
+    mongodb:
+      enabled: ${MONGODB_ENABLED:false}
+
+# ====================================================================
+# CLUSTER (comment lại — bỏ comment khi cần):
+#   - Replica set (HA): liệt kê các member trong uri kèm replicaSet:
+#       uri: mongodb://h1:27017,h2:27017,h3:27017/base?replicaSet=rs0&readPreference=primaryPreferred&w=majority
+#   - Sharded cluster: trỏ uri tới các router mongos:
+#       uri: mongodb://mongos1:27017,mongos2:27017/base
+# ====================================================================

@@ -1,0 +1,9 @@
+# Giảm build context, tránh copy thừa vào Docker.
+target/
+logs/
+.git/
+.github/
+.idea/
+*.iml
+*.md
+.env

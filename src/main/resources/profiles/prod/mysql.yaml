@@ -1,0 +1,55 @@
+# ============================== MySQL (JPA Hibernate + JdbcTemplate) — OPT-IN, mặc định TẮT ==============================
+# Dùng CẢ JPA lẫn JdbcTemplate: khi BẬT, auto-config của Spring Boot tự cấp DataSource (HikariCP) ->
+# kéo theo JdbcTemplate + EntityManager (JPA) + Spring Data JPA repositories.
+#
+# Vì DataSourceAutoConfiguration sẽ FAIL lúc khởi động nếu thiếu url, nên mặc-định-TẮT bằng cách LOẠI
+# DataSourceAutoConfiguration (JdbcTemplate/JPA/Repositories tự "backs-off" theo vì không còn bean DataSource).
+#
+# CÁCH BẬT: (1) cung cấp creds MYSQL_URL/MYSQL_USERNAME/MYSQL_PASSWORD; (2) đặt MYSQL_AUTOCONFIGURE_EXCLUDE
+# RỖNG (MYSQL_AUTOCONFIGURE_EXCLUDE=) để bật lại auto-config; (3) MYSQL_ENABLED=true để bật health indicator.
+spring:
+  autoconfigure:
+    # TẮT (mặc định): chỉ cần loại DataSourceAutoConfiguration, các auto-config JPA/JdbcTemplate phụ thuộc sẽ tự tắt theo.
+    # Spring Boot 4: DataSourceAutoConfiguration nằm ở package org.springframework.boot.jdbc.autoconfigure.
+    exclude: ${MYSQL_AUTOCONFIGURE_EXCLUDE:org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration}
+  datasource:
+    url: ${MYSQL_URL:jdbc:mysql://localhost:3306/base?useSSL=false&serverTimezone=UTC&characterEncoding=UTF-8}
+    username: ${MYSQL_USERNAME:root}
+    password: ${MYSQL_PASSWORD:}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      pool-name: base-mysql-pool
+      maximum-pool-size: ${MYSQL_POOL_MAX:10}            # số kết nối tối đa của pool
+      minimum-idle: ${MYSQL_POOL_MIN_IDLE:2}             # số kết nối idle tối thiểu giữ sẵn
+      connection-timeout: ${MYSQL_CONN_TIMEOUT:30000}    # chờ tối đa để lấy 1 kết nối từ pool (ms)
+      idle-timeout: ${MYSQL_IDLE_TIMEOUT:600000}         # kết nối idle quá hạn này bị dọn (ms)
+      max-lifetime: ${MYSQL_MAX_LIFETIME:1800000}        # tuổi thọ tối đa 1 kết nối (ms) — nên nhỏ hơn wait_timeout của MySQL
+      auto-commit: true
+  jpa:
+    open-in-view: false                                  # TẮT Open-Session-In-View — tránh giữ session/connection quá lâu
+    hibernate:
+      ddl-auto: ${MYSQL_DDL_AUTO:none}                   # prod: none; dev có thể validate/update nếu cần
+    database-platform: ${MYSQL_DIALECT:org.hibernate.dialect.MySQLDialect}
+    show-sql: ${MYSQL_SHOW_SQL:false}
+    properties:
+      hibernate:
+        format_sql: false
+        jdbc:
+          batch_size: 30                                 # gộp batch insert/update để giảm round-trip
+        order_inserts: true
+        order_updates: true
+
+# Health indicator của DataSource chỉ BẬT khi MySQL bật (giữ /actuator/health UP khi TẮT).
+management:
+  health:
+    db:
+      enabled: ${MYSQL_ENABLED:false}
+
+# ====================================================================
+# CLUSTER / HA (comment lại — bỏ comment khi cần):
+# MySQL không có "client cluster" như Redis; HA thường làm qua JDBC URL nhiều host:
+#   - Read/Write splitting (replication): master ghi, replica đọc
+#       url: jdbc:mysql:replication://master:3306,replica1:3306,replica2:3306/base
+#   - Load balancing nhiều node ngang hàng (vd Galera/InnoDB Cluster qua router):
+#       url: jdbc:mysql:loadbalance://node1:3306,node2:3306,node3:3306/base
+# ====================================================================

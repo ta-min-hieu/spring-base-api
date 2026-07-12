@@ -1,0 +1,42 @@
+# ============================== RabbitMQ (AMQP) — OPT-IN, mặc định TẮT ==============================
+# Auto-config tạo CachingConnectionFactory + RabbitTemplate; kết nối LƯỜI (chỉ kết nối khi dùng lần đầu),
+# và base KHÔNG khai báo @RabbitListener nào nên không có consumer chạy lúc khởi động.
+#
+# CÁCH BẬT: RABBITMQ_ENABLED=true + host/port/credentials. Topology (exchange/queue/binding) khai báo trong
+# dự án dùng base (vd các @Bean Queue/Exchange/Binding hoặc RabbitAdmin), base chỉ cung cấp kết nối + RabbitTemplate.
+spring:
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+    virtual-host: ${RABBITMQ_VHOST:/}
+    connection-timeout: ${RABBITMQ_CONN_TIMEOUT:5000}    # timeout thiết lập kết nối (ms)
+    # publisher-confirm-type: ${RABBITMQ_PUBLISHER_CONFIRM:correlated}  # xác nhận message đã tới broker
+    # publisher-returns: ${RABBITMQ_PUBLISHER_RETURNS:true}             # trả lại message không route được
+    listener:
+      simple:
+        concurrency: ${RABBITMQ_LISTENER_CONCURRENCY:1}              # số consumer tối thiểu mỗi listener
+        max-concurrency: ${RABBITMQ_LISTENER_MAX_CONCURRENCY:5}      # số consumer tối đa khi tải cao
+        prefetch: ${RABBITMQ_PREFETCH:10}                            # số message lấy trước mỗi consumer (QoS)
+        acknowledge-mode: ${RABBITMQ_ACK_MODE:auto}                  # auto | manual | none
+        default-requeue-rejected: false                             # message lỗi KHÔNG requeue vô hạn -> đẩy DLQ
+        retry:
+          enabled: true
+          max-attempts: ${RABBITMQ_RETRY_MAX_ATTEMPTS:3}
+          initial-interval: ${RABBITMQ_RETRY_INTERVAL:1000}
+    # ssl:
+    #   enabled: ${RABBITMQ_SSL_ENABLED:true}
+
+# Health indicator RabbitMQ chỉ BẬT khi Rabbit bật (giữ /actuator/health UP khi TẮT).
+management:
+  health:
+    rabbit:
+      enabled: ${RABBITMQ_ENABLED:false}
+
+# ====================================================================
+# CLUSTER (comment lại — bỏ comment khi cần): nhiều node, dùng "addresses" THAY host/port.
+#   spring.rabbitmq:
+#     addresses: ${RABBITMQ_ADDRESSES:node1:5672,node2:5672,node3:5672}
+#     address-shuffle-mode: random    # phân tải/né dồn 1 node khi reconnect
+# ====================================================================

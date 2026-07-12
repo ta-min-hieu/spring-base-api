@@ -1,0 +1,13 @@
+# Observability/Actuator: chỉ phơi health (+ metrics) cho probe (LB/K8s).
+# show-details: never để không lộ thông tin nội bộ. Health indicator của từng infra (redis/db/mongo/...)
+# được bật/tắt trong file cấu hình của infra tương ứng.
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never

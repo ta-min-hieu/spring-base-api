@@ -1,0 +1,44 @@
+# ====================================================================
+# Cấu hình Redis — DÙNG CẤU HÌNH GỐC CỦA SPRING (spring.data.redis.*),
+# không khai báo lại qua app.*. File này áp cho cả cache (RedisCacheManager)
+# lẫn distributed lock (RedissonClient).
+#
+# Mặc định TẮT (enabled=false) để base chạy/test được khi CHƯA có Redis.
+# Bật: đặt spring.data.redis.enabled=true (hoặc env REDIS_ENABLED=true).
+#
+# CHẾ ĐỘ tự suy ra: có cluster.nodes -> chạy CLUSTER; không có -> chạy STANDALONE theo host/port.
+# ====================================================================
+spring:
+  data:
+    redis:
+      enabled: ${REDIS_ENABLED:false}        # cờ tổng: bật/tắt toàn bộ bean Redis + Redisson
+
+      # --- STANDALONE (1 node) ---
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      username: ${REDIS_USERNAME:}            # Redis 6+ ACL; để trống nếu không dùng
+      password: ${REDIS_PASSWORD:}
+      database: ${REDIS_DATABASE:0}
+      timeout: ${REDIS_TIMEOUT:3000ms}        # timeout lệnh
+      ssl:
+        enabled: ${REDIS_SSL:false}
+
+      # --- CLUSTER (nhiều node) — BỎ COMMENT để chạy cluster (khi đó host/port ở trên bị bỏ qua) ---
+      # cluster:
+      #   nodes: ${REDIS_CLUSTER_NODES:127.0.0.1:7000,127.0.0.1:7001,127.0.0.1:7002}
+      #   max-redirects: ${REDIS_CLUSTER_MAX_REDIRECTS:3}
+
+      # --- Pool kết nối Lettuce ---
+      lettuce:
+        pool:
+          enabled: true
+          max-active: ${REDIS_POOL_MAX_ACTIVE:64}   # tổng kết nối tối đa
+          max-idle: ${REDIS_POOL_MAX_IDLE:32}
+          min-idle: ${REDIS_POOL_MIN_IDLE:8}
+          max-wait: ${REDIS_POOL_MAX_WAIT:3000ms}   # chờ tối đa khi pool cạn
+
+# Health-check Redis của actuator bám theo cùng cờ: Redis TẮT thì KHÔNG ping (tránh /actuator/health -> DOWN).
+management:
+  health:
+    redis:
+      enabled: ${REDIS_ENABLED:false}

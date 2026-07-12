@@ -1,0 +1,5 @@
+# Cấu hình cache dùng chung (prefix key, dấu phân tách, TTL mặc định tính bằng giờ).
+cache:
+  prefix-key: "base:"
+  delimiter: ":"
+  ttl-default: 6

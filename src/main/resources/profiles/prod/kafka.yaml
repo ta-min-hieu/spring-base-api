@@ -1,0 +1,47 @@
+# ============================== Kafka — OPT-IN, mặc định TẮT ==============================
+# Auto-config tạo KafkaTemplate (producer) + hạ tầng cho @KafkaListener; producer/consumer kết nối LƯỜI và
+# base KHÔNG khai báo @KafkaListener nào nên không có consumer chạy lúc khởi động (đường TẮT không kết nối).
+#
+# CÁCH BẬT: KAFKA_ENABLED=true (quy ước; Kafka không có health indicator mặc định) + KAFKA_BOOTSTRAP_SERVERS.
+# Mặc định dùng serializer String cho đơn giản; muốn JSON thì xem khối comment phía dưới.
+spring:
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    client-id: ${KAFKA_CLIENT_ID:base}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: ${KAFKA_PRODUCER_ACKS:all}                   # all = bền nhất (chờ mọi in-sync replica xác nhận)
+      retries: ${KAFKA_PRODUCER_RETRIES:3}
+      batch-size: ${KAFKA_PRODUCER_BATCH_SIZE:16384}     # gộp message theo lô (bytes) để tăng throughput
+      properties:
+        linger.ms: ${KAFKA_PRODUCER_LINGER_MS:5}         # chờ thêm để gom lô trước khi gửi
+        enable.idempotence: ${KAFKA_PRODUCER_IDEMPOTENCE:true}  # tránh gửi trùng khi retry
+    consumer:
+      group-id: ${KAFKA_CONSUMER_GROUP:base-consumer}
+      auto-offset-reset: ${KAFKA_AUTO_OFFSET_RESET:earliest}     # earliest | latest
+      enable-auto-commit: ${KAFKA_ENABLE_AUTO_COMMIT:false}      # false -> commit thủ công theo ack-mode listener
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      properties:
+        max.poll.records: ${KAFKA_MAX_POLL_RECORDS:500}
+    listener:
+      concurrency: ${KAFKA_LISTENER_CONCURRENCY:1}               # số consumer thread mỗi listener (<= số partition)
+      ack-mode: ${KAFKA_LISTENER_ACK_MODE:manual_immediate}     # commit offset thủ công sau khi xử lý xong
+    admin:
+      fail-fast: false                                          # broker chưa sẵn sàng -> chỉ cảnh báo, KHÔNG fail khởi động
+
+# ====================================================================
+# CLUSTER + JSON + BẢO MẬT (comment lại — bỏ comment khi cần):
+#   - Nhiều broker:
+#       bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:b1:9092,b2:9092,b3:9092}
+#   - Value dạng JSON (thay String serializer ở trên):
+#       producer.value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+#       consumer.value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+#       consumer.properties.spring.json.trusted.packages: "com.ringme.*"
+#   - Bảo mật SASL_SSL (managed Kafka / cloud):
+#       security.protocol: SASL_SSL
+#       properties:
+#         sasl.mechanism: SCRAM-SHA-512
+#         sasl.jaas.config: org.apache.kafka.common.security.scram.ScramLoginModule required username="u" password="p";
+# ====================================================================

@@ -1,0 +1,14 @@
+# Cấu hình client HTTP ra ngoài (RestTemplate): pool kết nối, các timeout, retry tầng transport.
+rest-template:
+  max-total-connection: 1500          # tổng kết nối tối đa của pool
+  max-route-connection: 500           # tối đa kết nối cho mỗi host (route)
+  connection-timeout: 3000            # timeout thiết lập kết nối (ms)
+  request-timeout: 3000               # timeout lấy 1 kết nối từ pool khi pool cạn (ms)
+  response-timeout: 10000             # timeout chờ phản hồi (ms)
+  socket-timeout: 10000               # timeout đọc socket (ms)
+  keep-alive-time: 20000              # giữ kết nối sống tối đa khi idle (ms)
+  evict-idle-connections: 60000       # dọn kết nối idle quá hạn này (ms)
+  connection-ttl: 300000              # tuổi thọ tối đa 1 kết nối rồi tái tạo (ms) — tránh dính 1 backend sau LB
+  validate-after-inactivity: 5000     # kiểm tra kết nối stale sau khoảng idle này (ms) — giảm NoHttpResponseException
+  retry-count: 2                      # số lần retry cho request idempotent khi lỗi kết nối/stale
+  retry-interval: 500                 # khoảng chờ giữa các lần retry (ms)

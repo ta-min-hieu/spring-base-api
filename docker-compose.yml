@@ -1,0 +1,43 @@
+# Docker Compose mẫu cho base API.
+# - Phơi đầy đủ biến môi trường cần thiết (đọc từ .env hoặc shell, có giá trị mặc định cho dev).
+# - Mount thư mục logs ra host để xem log trực tiếp.
+# Chạy:  docker compose up --build -d
+# Xem:   curl http://localhost:8386/base/actuator/health
+# Dừng:  docker compose down
+
+services:
+  base-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: base-api:latest
+    container_name: base-api
+    ports:
+      - "8386:8386"
+    environment:
+      # Profile: dev (mặc định) | uat | prod
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+      # Bí mật dùng chung — BẮT BUỘC đặt giá trị thật ở prod.
+      APP_SECURITY: ${APP_SECURITY:-change-me-in-env}
+      # Khóa ký JWT. Dev dùng khóa bundled trong jar (classpath). Prod: mount khóa ngoài (xem volumes).
+      JWT_PUBLIC_KEY_PATH: ${JWT_PUBLIC_KEY_PATH:-keys/public.pem}
+      JWT_PRIVATE_KEY_PATH: ${JWT_PRIVATE_KEY_PATH:-keys/private.pem}
+      JWT_ACCESS_TTL: ${JWT_ACCESS_TTL:-86400}
+      JWT_REFRESH_TTL: ${JWT_REFRESH_TTL:-172800}
+      # Domain CDN gốc cho URL media.
+      CDN_MEDIA_DOMAIN: ${CDN_MEDIA_DOMAIN:-https://base-cdn.example}
+      # CORS — KHÔNG dùng "*" ở prod.
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-*}
+    volumes:
+      # Mount logs ra host (app ghi vào /app/logs: main.log, error.log, request.log).
+      - ./logs:/app/logs
+      # Prod: bỏ comment để mount khóa JWT từ host, rồi đặt JWT_*_KEY_PATH = /app/keys/*.pem
+      # - ./keys:/app/keys:ro
+    healthcheck:
+      # Kiểm tra nhẹ: cổng 8386 đã listen chưa (không cần cài thêm curl trong image).
+      test: ["CMD-SHELL", "bash -c ':> /dev/tcp/127.0.0.1/8386' || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    restart: unless-stopped

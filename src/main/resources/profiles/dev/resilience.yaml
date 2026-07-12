@@ -1,0 +1,53 @@
+# ====================================================================
+# Khả năng chịu lỗi (Resilience4j) + hành vi bộ lọc giới hạn request đầu vào.
+# NƠI DUY NHẤT chỉnh ngưỡng chịu lỗi:
+#  - circuitbreaker: cho lời gọi HTTP RA NGOÀI (outbound) — fail-fast khi upstream chết.
+#  - ratelimiter:    giới hạn request ĐI VÀO service này (inbound) — chặn khi bị gọi quá nhiều.
+# ====================================================================
+resilience4j:
+  circuitbreaker:
+    configs:
+      # "default" được áp cho MỌI circuit breaker (kể cả breaker tạo theo tên từng upstream).
+      default:
+        sliding-window-type: COUNT_BASED                  # đếm theo SỐ call (không theo thời gian)
+        sliding-window-size: 20                           # xét trên 20 call gần nhất
+        minimum-number-of-calls: 10                       # đủ 10 call mới bắt đầu tính tỉ lệ lỗi
+        failure-rate-threshold: 50                        # > 50% call lỗi -> MỞ mạch
+        wait-duration-in-open-state: 10s                  # mở 10s rồi chuyển HALF_OPEN để thử lại
+        permitted-number-of-calls-in-half-open-state: 5   # cho 5 call thử khi HALF_OPEN
+        # Lỗi HTTP của upstream (4xx/5xx) KHÔNG tính là lỗi mạch (call vẫn "tới nơi", chỉ trả mã lỗi);
+        # chỉ lỗi tầng kết nối/timeout mới làm mở mạch.
+        ignore-exceptions:
+          - org.springframework.web.client.RestClientResponseException
+        # Không gắn health indicator để mạch mở KHÔNG kéo /actuator/health xuống DOWN.
+        register-health-indicator: false
+    instances:
+      outboundHttp:                                       # breaker dùng chung (bean outboundHttpCircuitBreaker)
+        base-config: default
+  ratelimiter:
+    configs:
+      # "inbound" là CONFIG khuôn mẫu — RateLimitFilter cấp cho MỖI IP client một limiter riêng theo config này.
+      inbound:
+        # Số request tối đa cho MỖI chu kỳ, TÍNH RIÊNG TỪNG IP. Chỉnh theo sức chịu tải.
+        limit-for-period: ${INBOUND_RATE_LIMIT:1000}
+        # Độ dài mỗi chu kỳ: cứ sau khoảng này lại cấp lại đủ limit-for-period lượt.
+        limit-refresh-period: ${INBOUND_RATE_REFRESH:1s}
+        # Thời gian 1 request chịu CHỜ để xin lượt; 0 = hết lượt thì TỪ CHỐI NGAY (trả 429).
+        timeout-duration: ${INBOUND_RATE_TIMEOUT:0}
+        register-health-indicator: false
+
+app:
+  # Hành vi bộ lọc giới hạn request đầu vào (RateLimitFilter). Ngưỡng SỐ LƯỢNG ở resilience4j.ratelimiter.
+  rate-limit:
+    enabled: ${INBOUND_RATE_LIMIT_ENABLED:true}           # bật/tắt; tắt = không đăng ký filter
+    limiter-name: inbound                                  # trỏ tới resilience4j.ratelimiter.configs.inbound
+    # Header lấy IP thật khi đứng sau proxy/LB (vd X-Forwarded-For). Để TRỐNG = dùng remoteAddr.
+    # CHỈ set khi proxy đáng tin tự ghi header, tránh client giả mạo IP để né giới hạn.
+    client-ip-header: ${INBOUND_RATE_IP_HEADER:}
+    # Giới hạn cache limiter theo IP (chống phình bộ nhớ khi có quá nhiều IP khác nhau).
+    max-clients: ${INBOUND_RATE_MAX_CLIENTS:100000}        # số IP tối đa giữ trong cache
+    client-ttl: ${INBOUND_RATE_CLIENT_TTL:10m}             # IP nhàn rỗi quá hạn này thì dọn (reset quota khi quay lại)
+    excluded-paths:                                        # path (sau context-path /base) KHÔNG bị giới hạn
+      - /actuator/health
+      - /swagger-ui
+      - /v3/api-docs

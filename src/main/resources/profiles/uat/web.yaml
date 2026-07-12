@@ -1,0 +1,25 @@
+# Cấu hình tầng web: i18n, tài liệu OpenAPI/Swagger và media.
+spring:
+  messages:
+    basename: i18n/messages
+    encoding: UTF-8
+    # Không khớp ngôn ngữ -> dùng bundle mặc định (messages.properties), không phụ thuộc locale của máy chủ.
+    fallback-to-system-locale: false
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: alpha
+  api-docs:
+    path: /v3/api-docs
+
+app:
+  domain:
+    cdn:
+      media: ${CDN_MEDIA_DOMAIN:https://base-cdn.example}
+  img:
+    default: default
+  audio:
+    default: default
+  avatar:
+    default: default

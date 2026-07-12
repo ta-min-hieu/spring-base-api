@@ -1,0 +1,14 @@
+# Cấu hình server và runtime.
+server:
+  port: 8386
+  servlet:
+    context-path: /base
+
+spring:
+  servlet:
+    multipart:
+      max-file-size: 300MB
+      max-request-size: 300MB
+  threads:
+    virtual:
+      enabled: true

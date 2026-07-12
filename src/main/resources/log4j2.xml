@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration cmd="trace">
+    <Properties>
+        <Property name="log.pattern">%d{yyyy-MM-dd HH:mm:ss} [%t] [%X{contextId}] %-5p %c{1}.%M:%L - %msg%n</Property>
+    </Properties>
+
+    <Appenders>
+        <Console name="CONSOLE" target="SYSTEM_OUT">
+            <PatternLayout pattern="${log.pattern}"/>
+        </Console>
+
+        <RollingFile name="MAIN_INFO"
+                     filename="logs/main.log"
+                     filepattern="logs/main.%d{yyyy-MM-dd}-%i.log.gz">
+            <PatternLayout pattern="${log.pattern}"/>
+            <Policies>
+                <SizeBasedTriggeringPolicy size="1024 MB"/>
+                <TimeBasedTriggeringPolicy/>
+            </Policies>
+            <ThresholdFilter level="INFO" onMatch="ACCEPT" onMismatch="DENY"/>
+            <DefaultRolloverStrategy>
+                <Delete basePath="logs">
+                    <IfFileName glob="main.*.log.gz"/>
+                    <IfLastModified age="P7D"/>
+                </Delete>
+            </DefaultRolloverStrategy>
+        </RollingFile>
+
+        <RollingFile name="MAIN_ERROR"
+                     filename="logs/error.log"
+                     filepattern="logs/error.%d{yyyy-MM-dd}-%i.log.gz">
+            <PatternLayout pattern="${log.pattern}"/>
+            <Policies>
+                <SizeBasedTriggeringPolicy size="300 MB"/>
+                <TimeBasedTriggeringPolicy/>
+            </Policies>
+            <ThresholdFilter level="ERROR" onMatch="ACCEPT" onMismatch="DENY"/>
+            <DefaultRolloverStrategy>
+                <Delete basePath="logs">
+                    <IfFileName glob="error.*.log.gz"/>
+                    <IfLastModified age="P3D"/>
+                </Delete>
+            </DefaultRolloverStrategy>
+        </RollingFile>
+
+        <RollingFile name="REQUEST_INFO"
+                     filename="logs/request.log"
+                     filepattern="logs/request.%d{yyyy-MM-dd}-%i.log.gz">
+            <PatternLayout pattern="${log.pattern}"/>
+            <Policies>
+                <SizeBasedTriggeringPolicy size="1024 MB"/>
+                <TimeBasedTriggeringPolicy/>
+            </Policies>
+            <ThresholdFilter level="INFO" onMatch="ACCEPT" onMismatch="DENY"/>
+            <DefaultRolloverStrategy>
+                <Delete basePath="logs">
+                    <IfFileName glob="request.*.log.gz"/>
+                    <IfLastModified age="P3D"/>
+                </Delete>
+            </DefaultRolloverStrategy>
+        </RollingFile>
+    </Appenders>
+    <Loggers>
+        <Root level="info">
+            <AppenderRef ref="MAIN_INFO"/>
+            <AppenderRef ref="MAIN_ERROR"/>
+            <AppenderRef ref="CONSOLE"/>
+        </Root>
+        <Logger name="request" level="info" additivity="false">
+            <AppenderRef ref="REQUEST_INFO"/>
+        </Logger>
+    </Loggers>
+</Configuration>
+

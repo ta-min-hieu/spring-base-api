@@ -1,0 +1,16 @@
+services:
+  mariadb:
+    image: mariadb:11
+    container_name: mariadb
+    ports:
+      - "3306:3306"
+    environment:
+      - 'MARIADB_ROOT_PASSWORD=Hieu123456789a'
+      - 'MARIADB_USER=dev'
+      - 'MARIADB_PASSWORD=Hieu123456789a'
+      - 'MARIADB_DATABASE=dev_e_commerce'
+    volumes:
+      - mariadb_data:/var/lib/mysql
+
+volumes:
+  mariadb_data:

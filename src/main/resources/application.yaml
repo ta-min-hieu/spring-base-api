@@ -1,0 +1,57 @@
+# File DUY NHẤT ở ngoài cùng: chỉ giữ tên ứng dụng, profile active và DANH SÁCH file cấu hình.
+# Mọi cấu hình khác nằm trong profiles/<profile>/, tách theo nhóm chức năng.
+app:
+  # Thêm môi trường mới: tạo thư mục profiles/<tên>/ với các file dưới đây và set SPRING_PROFILES_ACTIVE=<tên>.
+  profile: ${SPRING_PROFILES_ACTIVE:dev}
+
+spring:
+  application:
+    name: base
+  profiles:
+    active: ${app.profile}
+  datasource:
+    hikari:
+      connectionTimeout: 30000
+      idleTimeout: 30000
+      maxLifetime: 2000000
+      maximumPoolSize: 100
+      minimumIdle: 5
+      poolName: HikariCP
+    url: ${DB_DWH_URL:jdbc:oracle:thin:@localhost:1521/XE}
+    username: ${DB_DWH_USERNAME:dev}
+    password: ${DB_DWH_PASSWORD:Hieu123456789a}
+  config:
+    # Import cả THƯ MỤC profile (Spring ghép từng tên trong spring.config.name để nạp
+    # server/web/integration/security/redis.yaml) VÀ (tùy chọn) config tập trung từ Consul.
+    # optional: cho phép thiếu file / Consul tắt hoặc không kết nối được cũng KHÔNG lỗi.
+    import:
+      - "optional:classpath:/profiles/${app.profile}/"
+      - "optional:consul:"
+
+  # ===== Spring Cloud Consul (config tập trung + service discovery) =====
+  # Đặt Ở ĐÂY (application.yaml) vì 'spring.config.import: consul' được xử lý RẤT SỚM (bootstrap),
+  # không nạp được từ file profile. Mặc định TẮT để base chạy/test được khi chưa có Consul;
+  # bật và chỉnh toàn bộ qua biến môi trường.
+  cloud:
+    consul:
+      enabled: ${CONSUL_ENABLED:false}                 # cờ TỔNG: tắt = bỏ qua toàn bộ Consul
+      host: ${CONSUL_HOST:localhost}
+      port: ${CONSUL_PORT:8500}
+      scheme: ${CONSUL_SCHEME:http}
+      config:
+        enabled: ${CONSUL_CONFIG_ENABLED:true}         # phần config tập trung (chỉ tác dụng khi cờ tổng bật)
+        format: ${CONSUL_CONFIG_FORMAT:YAML}           # định dạng value trong KV: YAML | PROPERTIES | KEY_VALUE | FILES
+        prefixes: ${CONSUL_CONFIG_PREFIX:config}         # tiền tố KV, vd config/base/data
+        default-context: ${CONSUL_CONFIG_DEFAULT_CONTEXT:application}
+        profile-separator: ','
+        data-key: ${CONSUL_CONFIG_DATA_KEY:data}       # tên key chứa nội dung khi format=YAML/PROPERTIES
+        watch:
+          enabled: ${CONSUL_CONFIG_WATCH_ENABLED:true} # tự nạp lại khi KV thay đổi
+      discovery:
+        enabled: ${CONSUL_DISCOVERY_ENABLED:false}     # đăng ký service vào Consul — OPT-IN riêng
+        register: ${CONSUL_DISCOVERY_REGISTER:true}
+        deregister: ${CONSUL_DISCOVERY_DEREGISTER:true}
+        prefer-ip-address: ${CONSUL_DISCOVERY_PREFER_IP:true}
+        instance-id: ${CONSUL_DISCOVERY_INSTANCE_ID:${spring.application.name}-${random.value}}
+        health-check-path: ${CONSUL_DISCOVERY_HEALTH_PATH:${server.servlet.context-path:}/actuator/health}
+        health-check-interval: ${CONSUL_DISCOVERY_HEALTH_INTERVAL:10s}

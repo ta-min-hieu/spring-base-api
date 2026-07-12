@@ -1,0 +1,25 @@
+# Cấu hình tầng web PROD: tắt swagger, domain CDN lấy từ biến môi trường.
+spring:
+  messages:
+    basename: i18n/messages
+    encoding: UTF-8
+    # Không khớp ngôn ngữ -> dùng bundle mặc định (messages.properties), không phụ thuộc locale của máy chủ.
+    fallback-to-system-locale: false
+
+# Tắt swagger ở prod.
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+app:
+  domain:
+    cdn:
+      media: ${CDN_MEDIA_DOMAIN}
+  img:
+    default: default
+  audio:
+    default: default
+  avatar:
+    default: default
