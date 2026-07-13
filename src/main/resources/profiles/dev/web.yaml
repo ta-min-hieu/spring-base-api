@@ -23,3 +23,13 @@ app:
     default: default
   avatar:
     default: default
+  storage:
+    root-dir: ${STORAGE_ROOT_DIR:E:/storage}
+    max-image-size: ${STORAGE_MAX_IMAGE_SIZE:10MB}
+    max-video-size: ${STORAGE_MAX_VIDEO_SIZE:200MB}
+    allowed-image-types: ${STORAGE_ALLOWED_IMAGE_TYPES:image/jpeg,image/png,image/gif,image/webp}
+    allowed-video-types: ${STORAGE_ALLOWED_VIDEO_TYPES:video/mp4,video/quicktime,video/x-msvideo,video/webm}
+    min-chunk-size: ${STORAGE_MIN_CHUNK_SIZE:256KB}
+    max-chunk-size: ${STORAGE_MAX_CHUNK_SIZE:20MB}
+    chunk-session-ttl: ${STORAGE_CHUNK_SESSION_TTL:2h}
+    max-chunk-sessions: ${STORAGE_MAX_CHUNK_SESSIONS:1000}

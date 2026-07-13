@@ -29,4 +29,5 @@ public class ProductResponse {
     private Boolean featured;
     private LocalDate releaseDate;
     private LocalDateTime publishedAt;
+    private List<UploadFileResponse> files;
 }

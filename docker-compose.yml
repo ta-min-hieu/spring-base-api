@@ -35,12 +35,17 @@ services:
       DB_DWH_PASSWORD: ${DB_DWH_PASSWORD:-Hieu123456789a}
       # MongoDB cũng standalone tương tự — không bắt buộc (client kết nối lười) nhưng trỏ đúng cho khỏi lỗi log.
       MONGODB_URI: ${MONGODB_URI:-mongodb://host.docker.internal:27017/base}
+      # Thư mục lưu file upload (ảnh/video). Default dev (E:/storage) là path Windows nên KHÔNG dùng được
+      # trong container Linux — phải trỏ path Linux + mount ra host để giữ file qua các lần recreate container.
+      STORAGE_ROOT_DIR: ${STORAGE_ROOT_DIR:-/app/storage}
     extra_hosts:
       # Linux Docker Engine không tự có host.docker.internal như Docker Desktop — khai báo tường minh.
       - "host.docker.internal:host-gateway"
     volumes:
       # Mount logs ra host (app ghi vào /app/logs: main.log, error.log, request.log).
       - ./logs:/app/logs
+      # Mount thư mục lưu file upload ra host để không mất khi container bị recreate.
+      - ./storage:/app/storage
       # Prod: bỏ comment để mount khóa JWT từ host, rồi đặt JWT_*_KEY_PATH = /app/keys/*.pem
       # - ./keys:/app/keys:ro
     healthcheck:

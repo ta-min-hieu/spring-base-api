@@ -24,6 +24,8 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MultipartException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -134,6 +136,23 @@ public class GlobalExceptionHandler {
         String expectedType = ex.getRequiredType() != null ? ex.getRequiredType().getSimpleName() : "hợp lệ";
         addError(errors, ex.getName(), "Giá trị '" + ex.getValue() + "' không đúng kiểu " + expectedType);
         return ResponseEntity.badRequest().body(AppCode.CODE_400.getResponse(errors));
+    }
+
+    // Thiếu part bắt buộc trong multipart/form-data (vd part 'product' của API tạo/sửa sản phẩm) -> 400.
+    @ExceptionHandler(MissingServletRequestPartException.class)
+    public ResponseEntity<?> handleMissingServletRequestPart(MissingServletRequestPartException ex) {
+        log.warn("BAD REQUEST: {}", ex.getMessage());
+        Map<String, List<String>> errors = new LinkedHashMap<>();
+        addError(errors, ex.getRequestPartName(), "Phần request bắt buộc bị thiếu");
+        return ResponseEntity.badRequest().body(AppCode.CODE_400.getResponse(errors));
+    }
+
+    // Request multipart sai định dạng hoặc vượt max-file-size/max-request-size
+    // (MaxUploadSizeExceededException kế thừa MultipartException) -> 400 thay vì 500.
+    @ExceptionHandler(MultipartException.class)
+    public ResponseEntity<?> handleMultipartException(MultipartException ex) {
+        log.warn("BAD REQUEST: {}", ex.getMessage());
+        return ResponseEntity.badRequest().body(AppCode.CODE_400.getResponse());
     }
 
     // Sai quyền (method security @RolesAllowed/@PreAuthorize ném AccessDeniedException/AuthorizationDeniedException

@@ -32,6 +32,7 @@ build/
 ### VS Code ###
 .vscode/
 logs/
+storage/
 
 ### Bí mật / Secrets ###
 # keys/public.pem & keys/private.pem đi kèm chỉ dùng cho DEV. Không commit khóa/bí mật thật.

@@ -39,6 +39,11 @@ public class RequestContextFilter extends OncePerRequestFilter {
     // cache body. Log vốn cắt còn 4KB nên 64KB là dư để hiển thị, đồng thời chặn rủi ro ngốn bộ nhớ khi body lớn.
     private static final int REQUEST_CONTENT_CACHE_LIMIT = 64 * 1024;
 
+    // ContentCachingResponseWrapper không có giới hạn dung lượng: nếu bọc cả endpoint trả file
+    // (GET /v1/files/{id}), toàn bộ file (có thể hàng trăm MB video) sẽ bị nạp hết vào RAM trước khi
+    // ghi ra client chỉ để phục vụ log. Các path stream file nên bỏ qua việc bọc response.
+    private static final String STREAMED_FILE_PATH_PREFIX = "/v1/files/";
+
     @Override
     protected void doFilterInternal(
             HttpServletRequest request,
@@ -46,10 +51,12 @@ public class RequestContextFilter extends OncePerRequestFilter {
             FilterChain filterChain)
             throws ServletException, IOException {
 
+        boolean streamedResponse = isStreamedFileRequest(request);
+
         ContentCachingRequestWrapper req =
                 new ContentCachingRequestWrapper(request, REQUEST_CONTENT_CACHE_LIMIT);
         ContentCachingResponseWrapper res =
-                new ContentCachingResponseWrapper(response);
+                streamedResponse ? null : new ContentCachingResponseWrapper(response);
 
         try {
             // Tạo uuid cho log để dễ debug lifecycle request
@@ -79,14 +86,25 @@ public class RequestContextFilter extends OncePerRequestFilter {
 
             RequestContextHolder.set(requestContext);
 
-            filterChain.doFilter(req, res);
+            filterChain.doFilter(req, res != null ? res : response);
         } finally {
-            logInfoRequest(req, res);
-            res.copyBodyToResponse();
+            logInfoRequest(req, res != null ? res : response, streamedResponse);
+            if (res != null) {
+                res.copyBodyToResponse();
+            }
 
             ThreadContext.clearMap();
             RequestContextHolder.clear();
         }
+    }
+
+    private boolean isStreamedFileRequest(HttpServletRequest request) {
+        String uri = request.getRequestURI();
+        String contextPath = request.getContextPath();
+        String path = (contextPath != null && !contextPath.isEmpty() && uri.startsWith(contextPath))
+                ? uri.substring(contextPath.length())
+                : uri;
+        return path.startsWith(STREAMED_FILE_PATH_PREFIX);
     }
 
     private String extractHeaders(HttpServletRequest request) {
@@ -120,13 +138,18 @@ public class RequestContextFilter extends OncePerRequestFilter {
     }
 
     private void logInfoRequest(ContentCachingRequestWrapper req,
-                                ContentCachingResponseWrapper res) {
+                                HttpServletResponse res,
+                                boolean streamedResponse) {
 
         String uri = req.getRequestURI();
         String query = req.getQueryString();
 
         String requestBody = safeBody(req.getContentAsByteArray(), 4 * 1024); // 4KB
-        String responseBody = safeBody(res.getContentAsByteArray(), 4 * 1024); // 4KB
+        // Path stream file (vd ảnh/video) không bị bọc ContentCachingResponseWrapper (tránh nạp cả
+        // file lớn vào RAM chỉ để log) nên không có body để đọc lại ở đây.
+        String responseBody = streamedResponse
+                ? "(streamed, not logged)"
+                : safeBody(((ContentCachingResponseWrapper) res).getContentAsByteArray(), 4 * 1024); // 4KB
 
         logReq.info(
                 "URI: {} | QUERY: {} | HEADER_REQ: {} | REQ: {} | HEADER_RESP: {} | RESP: {} | Exe: {} ms",
