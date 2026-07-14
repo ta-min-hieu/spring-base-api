@@ -1,10 +1,12 @@
 package com.ringme.base.filter;
 
+import com.ringme.base.security.PermissionEnrichmentService;
 import com.ringme.base.service.JwtAuthenticationService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -15,9 +17,12 @@ import java.io.IOException;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtAuthenticationService jwtAuthenticationService;
+    private final PermissionEnrichmentService permissionEnrichmentService;
 
-    public JwtAuthenticationFilter(JwtAuthenticationService jwtAuthenticationService) {
+    public JwtAuthenticationFilter(JwtAuthenticationService jwtAuthenticationService,
+                                    PermissionEnrichmentService permissionEnrichmentService) {
         this.jwtAuthenticationService = jwtAuthenticationService;
+        this.permissionEnrichmentService = permissionEnrichmentService;
     }
 
     @Override
@@ -33,10 +38,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
             String token = header.substring(7);
 
-            var auth = jwtAuthenticationService.authenticate(token);
+            UsernamePasswordAuthenticationToken auth = jwtAuthenticationService.authenticate(token);
 
             if (auth != null) {
-                SecurityContextHolder.getContext().setAuthentication(auth);
+                SecurityContextHolder.getContext().setAuthentication(permissionEnrichmentService.enrich(auth));
             }
         }
 

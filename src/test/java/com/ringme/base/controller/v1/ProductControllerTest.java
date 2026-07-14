@@ -3,8 +3,10 @@ package com.ringme.base.controller.v1;
 import com.ringme.base.dto.app.response.ProductResponse;
 import com.ringme.base.enums.AppCode;
 import com.ringme.base.config.rest.RateLimitProperties;
+import com.ringme.base.config.security.RbacAccessDeniedHandler;
 import com.ringme.base.enums.ProductStatus;
 import com.ringme.base.exception.BusinessLogicException;
+import com.ringme.base.security.PermissionEnrichmentService;
 import com.ringme.base.service.JwtAuthenticationService;
 import com.ringme.base.service.ProductService;
 import io.github.resilience4j.ratelimiter.RateLimiterRegistry;
@@ -58,6 +60,12 @@ class ProductControllerTest {
     // chỉ tắt việc ÁP DỤNG filter lúc chạy, không tắt việc khởi tạo bean -> vẫn cần bean này tồn tại.
     @MockitoBean
     private JwtAuthenticationService jwtAuthenticationService;
+
+    @MockitoBean
+    private PermissionEnrichmentService permissionEnrichmentService;
+
+    @MockitoBean
+    private RbacAccessDeniedHandler rbacAccessDeniedHandler;
 
     // RateLimitFilter (Filter -> cũng được @WebMvcTest load) cần RateLimiterRegistry, đến từ auto-config
     // Resilience4j mà slice test này không bật -> phải cấp mock để context khởi tạo được.

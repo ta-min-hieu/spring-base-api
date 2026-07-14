@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: postgres
+    ports:
+      - "5432:5432"
+    environment:
+      - 'POSTGRES_USER=dev'
+      - 'POSTGRES_PASSWORD=Hieu123456789a'
+      - 'POSTGRES_DB=dev_e_commerce'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:

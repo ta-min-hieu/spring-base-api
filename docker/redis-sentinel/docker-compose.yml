@@ -1,0 +1,102 @@
+services:
+  redis-master:
+    image: redis:7-alpine
+    container_name: redis-master
+    ports:
+      - "6379:6379"
+    command: >
+      redis-server
+      --port 6379
+      --requirepass Hieu123456789a
+      --masterauth Hieu123456789a
+      --appendonly yes
+    volumes:
+      - redis-sentinel_master-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "Hieu123456789a", "--no-auth-warning", "ping"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+
+  redis-replica-1:
+    image: redis:7-alpine
+    container_name: redis-replica-1
+    ports:
+      - "6380:6379"
+    depends_on:
+      redis-master:
+        condition: service_healthy
+    command: >
+      redis-server
+      --port 6379
+      --replicaof redis-master 6379
+      --requirepass Hieu123456789a
+      --masterauth Hieu123456789a
+      --appendonly yes
+    volumes:
+      - redis-sentinel_replica1-data:/data
+
+  redis-replica-2:
+    image: redis:7-alpine
+    container_name: redis-replica-2
+    ports:
+      - "6381:6379"
+    depends_on:
+      redis-master:
+        condition: service_healthy
+    command: >
+      redis-server
+      --port 6379
+      --replicaof redis-master 6379
+      --requirepass Hieu123456789a
+      --masterauth Hieu123456789a
+      --appendonly yes
+    volumes:
+      - redis-sentinel_replica2-data:/data
+
+  # 3 sentinel để có quorum lẻ (2/3) — quyết định failover khi master chết cần đa số đồng ý.
+  sentinel-1:
+    image: redis:7-alpine
+    container_name: sentinel-1
+    ports:
+      - "26379:26379"
+    depends_on:
+      redis-master:
+        condition: service_healthy
+    # Sentinel BẮT BUỘC phải có file config trên đĩa để ghi lại trạng thái (known replica/sentinel...),
+    # không chạy được thuần bằng CLI args như redis-server thường. Mount CẢ THƯ MỤC (không phải 1 file
+    # lẻ) vì bind-mount 1 file đơn lẻ khiến Sentinel rename tmp-config thất bại ("Resource busy") trên
+    # Docker Desktop — mount thư mục thì rename trong cùng thư mục hoạt động bình thường. Mỗi sentinel
+    # đọc/ghi 1 file riêng trong thư mục dùng chung này nên không đụng nhau.
+    volumes:
+      - ./conf:/etc/redis
+    command: redis-sentinel /etc/redis/sentinel-1.conf
+
+  sentinel-2:
+    image: redis:7-alpine
+    container_name: sentinel-2
+    ports:
+      - "26380:26379"
+    depends_on:
+      redis-master:
+        condition: service_healthy
+    volumes:
+      - ./conf:/etc/redis
+    command: redis-sentinel /etc/redis/sentinel-2.conf
+
+  sentinel-3:
+    image: redis:7-alpine
+    container_name: sentinel-3
+    ports:
+      - "26381:26379"
+    depends_on:
+      redis-master:
+        condition: service_healthy
+    volumes:
+      - ./conf:/etc/redis
+    command: redis-sentinel /etc/redis/sentinel-3.conf
+
+volumes:
+  redis-sentinel_master-data:
+  redis-sentinel_replica1-data:
+  redis-sentinel_replica2-data:

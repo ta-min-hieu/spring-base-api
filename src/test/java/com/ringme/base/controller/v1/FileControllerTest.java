@@ -7,7 +7,9 @@ import com.ringme.base.enums.AppCode;
 import com.ringme.base.enums.FileCategory;
 import com.ringme.base.exception.BusinessLogicException;
 import com.ringme.base.config.rest.RateLimitProperties;
+import com.ringme.base.config.security.RbacAccessDeniedHandler;
 import com.ringme.base.config.storage.StorageProperties;
+import com.ringme.base.security.PermissionEnrichmentService;
 import com.ringme.base.service.ChunkedUploadService;
 import com.ringme.base.service.FileStorageService;
 import com.ringme.base.service.JwtAuthenticationService;
@@ -61,6 +63,14 @@ class FileControllerTest {
     // chỉ tắt việc ÁP DỤNG filter lúc chạy, không tắt việc khởi tạo bean -> vẫn cần bean này tồn tại.
     @MockitoBean
     private JwtAuthenticationService jwtAuthenticationService;
+
+    // JwtAuthenticationFilter (bồi thêm authority PERM_<code>) + SecurityConfig.accessDeniedHandler
+    // cũng là dependency của bean được build trong slice này (xem lý do ở trên).
+    @MockitoBean
+    private PermissionEnrichmentService permissionEnrichmentService;
+
+    @MockitoBean
+    private RbacAccessDeniedHandler rbacAccessDeniedHandler;
 
     // RateLimitFilter (Filter -> cũng được @WebMvcTest load) cần RateLimiterRegistry, đến từ auto-config
     // Resilience4j mà slice test này không bật -> phải cấp mock để context khởi tạo được.

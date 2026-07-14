@@ -37,6 +37,15 @@ services:
       DB_DWH_PASSWORD: ${DB_DWH_PASSWORD:-Hieu123456789a}
       # MongoDB cũng standalone tương tự — không bắt buộc (client kết nối lười) nhưng trỏ đúng cho khỏi lỗi log.
       MONGODB_URI: ${MONGODB_URI:-mongodb://host.docker.internal:27017/base}
+      # Keycloak (login v2) — cũng standalone (docker/keycloak/docker-compose.yml riêng), trỏ qua
+      # host.docker.internal tương tự Oracle/Mongo ở trên.
+      KEYCLOAK_LOGIN_ENABLED: ${KEYCLOAK_LOGIN_ENABLED:-false}
+      KEYCLOAK_AUTH_SERVER_URL: ${KEYCLOAK_AUTH_SERVER_URL:-http://host.docker.internal:8080}
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM:-base-realm}
+      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-base-api}
+      KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET:-}
+      # RBAC động theo API resource (User/Role/Permission/Menu) — xem sql/oracle/rbac.sql.
+      RBAC_ENABLED: ${RBAC_ENABLED:-false}
       # Thư mục lưu file upload (ảnh/video). Default dev (E:/storage) là path Windows nên KHÔNG dùng được
       # trong container Linux — phải trỏ path Linux + mount ra host để giữ file qua các lần recreate container.
       STORAGE_ROOT_DIR: ${STORAGE_ROOT_DIR:-/app/storage}

@@ -103,6 +103,13 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-security</artifactId>
         </dependency>
+        <!-- NimbusJwtDecoder: xác thực token do Keycloak cấp (JWKS) cho luồng login v2 — dùng như thư
+             viện thuần (không bật spring-boot-starter-oauth2-resource-server auto-config, vì hệ thống
+             tự quản filter chain qua JwtAuthenticationFilter/SecurityConfig sẵn có). Version do BOM Spring Boot quản. -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-oauth2-jose</artifactId>
+        </dependency>
         <!-- Spring Boot 4: hỗ trợ test bảo mật + tự áp springSecurity() cho MockMvc (@WithMockUser) nằm ở
              module spring-boot-security-test (SecurityMockMvcAutoConfiguration); kéo theo cả spring-security-test. -->
         <dependency>

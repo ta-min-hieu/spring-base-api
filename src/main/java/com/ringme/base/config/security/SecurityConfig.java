@@ -1,9 +1,13 @@
 package com.ringme.base.config.security;
 
+import com.ringme.base.filter.DynamicPermissionFilter;
 import com.ringme.base.filter.JwtAuthenticationFilter;
 import com.ringme.base.security.JwtProcessor;
 import com.ringme.base.security.RsaKeyLoader;
 import lombok.RequiredArgsConstructor;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -19,6 +23,7 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
@@ -36,6 +41,10 @@ import java.util.List;
 public class SecurityConfig {
     private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final RbacAccessDeniedHandler rbacAccessDeniedHandler;
+    // DynamicPermissionFilter chỉ tồn tại khi app.rbac.enabled=true (@ConditionalOnProperty) -> phải
+    // dùng ObjectProvider thay vì inject thẳng, nếu không context sẽ lỗi NoSuchBeanDefinition khi tắt RBAC.
+    private final ObjectProvider<DynamicPermissionFilter> dynamicPermissionFilterProvider;
 
     @Value("${app.jwt.public-key}")
     private String publicKeyPath;
@@ -64,6 +73,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(authorize -> {
                     authorize.requestMatchers(
                             "/v1/auth/**",
+                            "/v2/auth/**",
                             "/troubleshoot/**",
                             "/actuator/health/**",
                             "/v3/api-docs/**",
@@ -77,13 +87,38 @@ public class SecurityConfig {
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
-                .exceptionHandling(exception ->
-                        exception.authenticationEntryPoint(jwtAuthenticationEntryPoint)
+                .exceptionHandling(exception -> exception
+                        .authenticationEntryPoint(jwtAuthenticationEntryPoint)
+                        .accessDeniedHandler(rbacAccessDeniedHandler)
                 );
         http.addFilterBefore(jwtAuthenticationFilter,
                 UsernamePasswordAuthenticationFilter.class);
+        // Gắn TƯỜNG MINH sau AuthorizationFilter (thay vì để Spring Boot tự đăng ký như 1 servlet
+        // filter rời rạc) để đảm bảo AccessDeniedException của nó luôn được ExceptionTranslationFilter
+        // của CHÍNH security chain này bắt và giao cho rbacAccessDeniedHandler (403), không lẫn với
+        // authenticationEntryPoint (401). Không có gì để thêm khi app.rbac.enabled=false (bean rỗng).
+        DynamicPermissionFilter dynamicPermissionFilter = dynamicPermissionFilterProvider.getIfAvailable();
+        if (dynamicPermissionFilter != null) {
+            http.addFilterAfter(dynamicPermissionFilter, AuthorizationFilter.class);
+        }
 
         return http.build();
+    }
+
+    /**
+     * DynamicPermissionFilter vẫn là {@code @Component} (implements Filter) nên Spring Boot sẽ TỰ
+     * đăng ký thêm nó như 1 servlet filter độc lập (ngoài lần đã addFilterAfter ở trên) — request nào
+     * cũng bị kiểm tra permission 2 LẦN. Tắt đường tự đăng ký này, chỉ giữ lại bản đã gắn tường minh
+     * vào security chain. Chỉ tồn tại khi app.rbac.enabled=true (@ConditionalOnBean theo bean gốc).
+     */
+    @Bean
+    @ConditionalOnBean(DynamicPermissionFilter.class)
+    public FilterRegistrationBean<DynamicPermissionFilter> dynamicPermissionFilterRegistration(
+            DynamicPermissionFilter dynamicPermissionFilter) {
+        FilterRegistrationBean<DynamicPermissionFilter> registration =
+                new FilterRegistrationBean<>(dynamicPermissionFilter);
+        registration.setEnabled(false);
+        return registration;
     }
 
     @Bean

@@ -29,12 +29,21 @@ import java.time.Duration;
  */
 @Log4j2
 public enum KeyCache {
+    // Resource (method+URL pattern+code) mà 1 role_key được cấp — nguồn cho DynamicPermissionFilter
+    // và PermissionEnrichmentService (authority PERM_<code>). Đổi phân quyền của role thì cache này
+    // phải bị evict (xem RoleAssignmentServiceImpl) để có hiệu lực ngay, không phải đợi TTL.
+    ROLE_PERMISSIONS(CacheName.ROLE_PERMISSIONS, Duration.ofHours(6)),
+    // Menu hiển thị được cho 1 role_key — nguồn cho GET /v1/rbac/me/menus.
+    ROLE_MENUS(CacheName.ROLE_MENUS, Duration.ofHours(6)),
     ;
 
     // Mục đích để dùng được trên annotation (giá trị String hằng số). Thêm hằng tương ứng mỗi cache key.
     public static final class CacheName {
         private CacheName() {
         }
+
+        public static final String ROLE_PERMISSIONS = "ROLE_PERMISSIONS";
+        public static final String ROLE_MENUS = "ROLE_MENUS";
     }
 
     private final String NAME;
