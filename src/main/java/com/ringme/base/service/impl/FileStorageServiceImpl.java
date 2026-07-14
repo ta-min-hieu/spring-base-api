@@ -55,6 +55,15 @@ public class FileStorageServiceImpl implements FileStorageService {
             throw new BusinessLogicException(AppCode.CODE_500, "Cannot store file");
         }
 
+        try {
+            // validateContentType chỉ tin header Content-Type client tự khai — đọc lại vài byte đầu
+            // của file THẬT vừa ghi để đối chiếu chữ ký, chặn kiểu giả mạo "đổi tên .exe thành .png".
+            support.verifyMagicBytes(file.getContentType(), targetFile);
+        } catch (BusinessLogicException e) {
+            deleteQuietly(targetFile);
+            throw e;
+        }
+
         UploadFile uploadFile = new UploadFile();
         uploadFile.setOriginalFileName(file.getOriginalFilename());
         uploadFile.setStoredFileName(storedFileName);
@@ -91,12 +100,15 @@ public class FileStorageServiceImpl implements FileStorageService {
     @Override
     @Transactional
     public void delete(UploadFile uploadFile) {
-        Path file = support.rootDir().resolve(uploadFile.getFilePath()).normalize();
+        deleteQuietly(support.rootDir().resolve(uploadFile.getFilePath()).normalize());
+        uploadFileRepository.delete(uploadFile);
+    }
+
+    private void deleteQuietly(Path file) {
         try {
             Files.deleteIfExists(file);
         } catch (IOException e) {
             log.warn("Cannot delete physical file {}: {}", file, e.getMessage());
         }
-        uploadFileRepository.delete(uploadFile);
     }
 }

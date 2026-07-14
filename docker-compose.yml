@@ -1,8 +1,12 @@
 # Docker Compose mẫu cho base API.
 # - Phơi đầy đủ biến môi trường cần thiết (đọc từ .env hoặc shell, có giá trị mặc định cho dev).
 # - Mount thư mục logs ra host để xem log trực tiếp.
+# - KHÔNG tự publish port ra host — điểm vào DUY NHẤT là nginx DÙNG CHUNG với project frontend
+#   (angular-enterprise-starter), nằm ở E:/study/shared-nginx (network "shared-edge"). Xem
+#   docker/nginx/default.conf.template (đã chuyển sang bên đó) để biết route /base/** -> service này.
+#   Cần tạo network 1 lần: `docker network create shared-edge` trước khi lên bất kỳ project nào.
 # Chạy:  docker compose up --build -d
-# Xem:   curl http://localhost:8386/base/actuator/health
+# Xem:   curl http://localhost:8386/base/actuator/health   (qua shared-nginx)
 # Dừng:  docker compose down
 
 services:
@@ -12,8 +16,6 @@ services:
       dockerfile: Dockerfile
     image: base-api:latest
     container_name: base-api
-    ports:
-      - "8386:8386"
     environment:
       # Profile: dev (mặc định) | uat | prod
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
@@ -38,6 +40,8 @@ services:
       # Thư mục lưu file upload (ảnh/video). Default dev (E:/storage) là path Windows nên KHÔNG dùng được
       # trong container Linux — phải trỏ path Linux + mount ra host để giữ file qua các lần recreate container.
       STORAGE_ROOT_DIR: ${STORAGE_ROOT_DIR:-/app/storage}
+      # nginx đứng trước (service bên dưới) -> để nó tự phục vụ file qua sendfile thay vì app stream.
+      STORAGE_NGINX_ACCEL_REDIRECT_ENABLED: ${STORAGE_NGINX_ACCEL_REDIRECT_ENABLED:-true}
     extra_hosts:
       # Linux Docker Engine không tự có host.docker.internal như Docker Desktop — khai báo tường minh.
       - "host.docker.internal:host-gateway"
@@ -55,4 +59,12 @@ services:
       timeout: 5s
       retries: 5
       start_period: 40s
+    networks:
+      - default
+      - shared-edge
     restart: unless-stopped
+
+networks:
+  default: {}
+  shared-edge:
+    external: true

@@ -1,5 +1,6 @@
 package com.ringme.base.controller.v1;
 
+import com.ringme.base.config.storage.StorageProperties;
 import com.ringme.base.dto.app.request.InitChunkedUploadRequest;
 import com.ringme.base.dto.app.response.ChunkUploadProgressResponse;
 import com.ringme.base.dto.app.response.InitChunkedUploadResponse;
@@ -37,14 +38,16 @@ import java.nio.charset.StandardCharsets;
 @Tag(name = "File", description = "Xem/tải file (ảnh, video) đã upload; upload file lớn theo từng đoạn")
 public class FileController {
 
+    private static final String NGINX_INTERNAL_STORAGE_PREFIX = "/internal-storage/";
+
     private final FileStorageService fileStorageService;
     private final ChunkedUploadService chunkedUploadService;
+    private final StorageProperties storageProperties;
 
     @Operation(summary = "Tải/xem file theo id")
     @GetMapping("/{id}")
-    public ResponseEntity<Resource> download(@PathVariable Long id) {
+    public ResponseEntity<?> download(@PathVariable Long id) {
         UploadFile uploadFile = fileStorageService.findById(id);
-        Resource resource = fileStorageService.loadAsResource(uploadFile);
 
         MediaType mediaType;
         try {
@@ -57,6 +60,19 @@ public class FileController {
                 .filename(uploadFile.getOriginalFileName(), StandardCharsets.UTF_8)
                 .build();
 
+        if (storageProperties.isNginxAccelRedirectEnabled()) {
+            // App chỉ quyết định CÓ cho tải hay không (đã findById ở trên, 404 nếu không có) — không tự
+            // đọc file. Trả X-Accel-Redirect để nginx tự phục vụ byte thật bằng sendfile (xem
+            // docker/nginx/nginx.conf, location /internal-storage/), nhanh + rẻ hơn nhiều so với stream
+            // qua JVM, nhất là video lớn nhiều người xem cùng lúc.
+            return ResponseEntity.ok()
+                    .contentType(mediaType)
+                    .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
+                    .header("X-Accel-Redirect", NGINX_INTERNAL_STORAGE_PREFIX + uploadFile.getFilePath())
+                    .build();
+        }
+
+        Resource resource = fileStorageService.loadAsResource(uploadFile);
         return ResponseEntity.ok()
                 .contentType(mediaType)
                 .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())

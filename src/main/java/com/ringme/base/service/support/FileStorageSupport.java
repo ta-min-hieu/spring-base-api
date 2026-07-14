@@ -7,9 +7,15 @@ import com.ringme.base.exception.BusinessLogicException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -78,6 +84,81 @@ public class FileStorageSupport {
         }
         return targetFile;
     }
+
+    private static final int MAGIC_PROBE_SIZE = 16;
+
+    /**
+     * Đối chiếu vài byte đầu của file thật trên đĩa với chữ ký (magic number) đã biết của
+     * {@code contentType} — validateContentType chỉ tin Content-Type client TỰ khai báo, không đọc
+     * nội dung thật, nên 1 file .exe đổi tên/khai báo "image/png" vẫn lọt qua nếu không có bước này.
+     * Content-type KHÔNG có trong bảng chữ ký (vd định dạng hiếm ai đó tự thêm vào allow-list) thì bỏ
+     * qua (fail-open) thay vì chặn nhầm, vì bảng này không thể đầy đủ mọi định dạng.
+     */
+    public void verifyMagicBytes(String contentType, Path file) {
+        List<MagicSignature> signatures = MAGIC_SIGNATURES.get(contentType);
+        if (signatures == null) {
+            return;
+        }
+        byte[] header = readHeader(file);
+        boolean matches = signatures.stream().allMatch(sig -> sig.matches(header));
+        if (!matches) {
+            throw new BusinessLogicException(AppCode.CODE_400,
+                    "File content does not match declared content type: " + contentType);
+        }
+    }
+
+    private byte[] readHeader(Path file) {
+        try (InputStream in = Files.newInputStream(file)) {
+            byte[] buffer = new byte[MAGIC_PROBE_SIZE];
+            int total = 0;
+            int read;
+            while (total < buffer.length && (read = in.read(buffer, total, buffer.length - total)) != -1) {
+                total += read;
+            }
+            return total == buffer.length ? buffer : Arrays.copyOf(buffer, total);
+        } catch (IOException e) {
+            throw new BusinessLogicException(AppCode.CODE_500, "Cannot read file for validation");
+        }
+    }
+
+    /** 1 đoạn byte cố định phải khớp tại {@code offset} — 1 content-type có thể cần NHIỀU đoạn (vd WEBP). */
+    private record MagicSignature(int offset, byte[] magic) {
+        boolean matches(byte[] header) {
+            if (header.length < offset + magic.length) {
+                return false;
+            }
+            for (int i = 0; i < magic.length; i++) {
+                if (header[offset + i] != magic[i]) {
+                    return false;
+                }
+            }
+            return true;
+        }
+    }
+
+    private static MagicSignature ascii(int offset, String text) {
+        return new MagicSignature(offset, text.getBytes(StandardCharsets.US_ASCII));
+    }
+
+    private static MagicSignature bytes(int offset, int... unsignedBytes) {
+        byte[] magic = new byte[unsignedBytes.length];
+        for (int i = 0; i < unsignedBytes.length; i++) {
+            magic[i] = (byte) unsignedBytes[i];
+        }
+        return new MagicSignature(offset, magic);
+    }
+
+    // Chỉ phủ đúng các content-type mặc định trong app.storage.allowed-*-types (STORAGE_ALLOWED_*_TYPES).
+    private static final Map<String, List<MagicSignature>> MAGIC_SIGNATURES = Map.of(
+            "image/jpeg", List.of(bytes(0, 0xFF, 0xD8, 0xFF)),
+            "image/png", List.of(bytes(0, 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A)),
+            "image/gif", List.of(ascii(0, "GIF8")),
+            "image/webp", List.of(ascii(0, "RIFF"), ascii(8, "WEBP")),
+            "video/mp4", List.of(ascii(4, "ftyp")),
+            "video/quicktime", List.of(ascii(4, "ftyp")),
+            "video/x-msvideo", List.of(ascii(0, "RIFF"), ascii(8, "AVI ")),
+            "video/webm", List.of(bytes(0, 0x1A, 0x45, 0xDF, 0xA3))
+    );
 
     /** Lấy đuôi file từ tên gốc, bỏ mọi phần thư mục/ký tự khác chữ-số để chặn path traversal. */
     private String sanitizedExtension(String originalFilename) {

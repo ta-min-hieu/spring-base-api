@@ -1,0 +1,296 @@
+{
+	"info": {
+		"_postman_id": "a1c2e3f4-5b6d-4e7a-8f9c-0d1e2f3a4b5c",
+		"name": "E-commerce",
+		"description": "API sản phẩm (CRUD + upload ảnh/video trực tiếp + upload theo từng đoạn cho file lớn) của spring-base-api. Chạy 'Login' trước — accessToken/refreshToken tự lưu vào collection variables và các request khác dùng lại qua Bearer Token kế thừa.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{ "key": "token", "value": "{{accessToken}}", "type": "string" }
+		]
+	},
+	"variable": [
+		{ "key": "baseUrl", "value": "http://localhost:8386/base" },
+		{ "key": "username", "value": "testuser" },
+		{ "key": "password", "value": "Test@12345" },
+		{ "key": "accessToken", "value": "" },
+		{ "key": "refreshToken", "value": "" },
+		{ "key": "productId", "value": "" },
+		{ "key": "fileId", "value": "" },
+		{ "key": "uploadId", "value": "" },
+		{ "key": "totalChunks", "value": "" }
+	],
+	"item": [
+		{
+			"name": "Auth",
+			"item": [
+				{
+					"name": "Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"const body = pm.response.json();",
+									"if (body.data) {",
+									"    pm.collectionVariables.set('accessToken', body.data.accessToken);",
+									"    pm.collectionVariables.set('refreshToken', body.data.refreshToken);",
+									"}",
+									"pm.test('status 200', () => pm.response.to.have.status(200));"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [ { "key": "Content-Type", "value": "application/json" } ],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"{{password}}\"\n}"
+						},
+						"url": { "raw": "{{baseUrl}}/v1/auth/login", "host": [ "{{baseUrl}}" ], "path": [ "v1", "auth", "login" ] },
+						"description": "Cấp accessToken + refreshToken (RS512). Test script tự lưu vào collection variables."
+					}
+				},
+				{
+					"name": "Refresh Token",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"const body = pm.response.json();",
+									"if (body.data) {",
+									"    pm.collectionVariables.set('accessToken', body.data.accessToken);",
+									"    pm.collectionVariables.set('refreshToken', body.data.refreshToken);",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [ { "key": "Content-Type", "value": "application/json" } ],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+						},
+						"url": { "raw": "{{baseUrl}}/v1/auth/refresh-token", "host": [ "{{baseUrl}}" ], "path": [ "v1", "auth", "refresh-token" ] }
+					}
+				}
+			]
+		},
+		{
+			"name": "Products",
+			"item": [
+				{
+					"name": "List Products",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/v1/products?page=0&size=10",
+							"host": [ "{{baseUrl}}" ],
+							"path": [ "v1", "products" ],
+							"query": [
+								{ "key": "name", "value": "", "disabled": true, "description": "Tìm theo tên (tùy chọn)" },
+								{ "key": "page", "value": "0" },
+								{ "key": "size", "value": "10" }
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Product By Id",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": { "raw": "{{baseUrl}}/v1/products/{{productId}}", "host": [ "{{baseUrl}}" ], "path": [ "v1", "products", "{{productId}}" ] }
+					}
+				},
+				{
+					"name": "Create Product",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"const body = pm.response.json();",
+									"if (body.data && body.data.id) {",
+									"    pm.collectionVariables.set('productId', body.data.id);",
+									"}",
+									"pm.test('status 200', () => pm.response.to.have.status(200));"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "product",
+									"value": "{\n  \"name\": \"Ao thun\",\n  \"price\": 199.99,\n  \"stock\": 10,\n  \"category\": \"clothes\",\n  \"tags\": [\"summer\", \"cotton\"],\n  \"description\": \"Mo ta san pham\",\n  \"status\": \"active\",\n  \"featured\": true\n}",
+									"type": "text",
+									"contentType": "application/json"
+								},
+								{ "key": "files", "type": "file", "src": [], "description": "0..n ảnh/video nhỏ, upload trực tiếp (tùy chọn)" },
+								{ "key": "fileIds", "value": "", "type": "text", "disabled": true, "description": "id file lớn đã upload xong qua chunked upload (tùy chọn, có thể lặp key này nhiều lần)" }
+							]
+						},
+						"url": { "raw": "{{baseUrl}}/v1/products", "host": [ "{{baseUrl}}" ], "path": [ "v1", "products" ] },
+						"description": "multipart/form-data: part 'product' (JSON) + part 'files' (0..n, tùy chọn) + field 'fileIds' (0..n, tùy chọn)."
+					}
+				},
+				{
+					"name": "Update Product",
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "product",
+									"value": "{\n  \"name\": \"Ao thun (updated)\",\n  \"price\": 179.99,\n  \"stock\": 8,\n  \"category\": \"clothes\",\n  \"tags\": [\"summer\"],\n  \"description\": \"Mo ta cap nhat\",\n  \"status\": \"active\",\n  \"featured\": false\n}",
+									"type": "text",
+									"contentType": "application/json"
+								},
+								{ "key": "files", "type": "file", "src": [], "description": "Ảnh/video mới, nối thêm vào danh sách hiện có (tùy chọn)" },
+								{ "key": "fileIds", "value": "", "type": "text", "disabled": true }
+							]
+						},
+						"url": { "raw": "{{baseUrl}}/v1/products/{{productId}}", "host": [ "{{baseUrl}}" ], "path": [ "v1", "products", "{{productId}}" ] }
+					}
+				},
+				{
+					"name": "Delete Product",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": { "raw": "{{baseUrl}}/v1/products/{{productId}}", "host": [ "{{baseUrl}}" ], "path": [ "v1", "products", "{{productId}}" ] },
+						"description": "Xóa cả các file (ảnh/video) đã gắn."
+					}
+				},
+				{
+					"name": "Remove File From Product",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/v1/products/{{productId}}/files/{{fileId}}",
+							"host": [ "{{baseUrl}}" ],
+							"path": [ "v1", "products", "{{productId}}", "files", "{{fileId}}" ]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Files",
+			"item": [
+				{
+					"name": "Download File",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": { "raw": "{{baseUrl}}/v1/files/{{fileId}}", "host": [ "{{baseUrl}}" ], "path": [ "v1", "files", "{{fileId}}" ] },
+						"description": "Trả raw bytes (Content-Type đúng của file), hỗ trợ HTTP Range."
+					}
+				},
+				{
+					"name": "Init Chunked Upload",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"const body = pm.response.json();",
+									"if (body.data) {",
+									"    pm.collectionVariables.set('uploadId', body.data.uploadId);",
+									"    pm.collectionVariables.set('totalChunks', body.data.totalChunks);",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [ { "key": "Content-Type", "value": "application/json" } ],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"originalFileName\": \"video.mp4\",\n  \"contentType\": \"video/mp4\",\n  \"fileSize\": 2500000,\n  \"chunkSize\": 1000000\n}"
+						},
+						"url": { "raw": "{{baseUrl}}/v1/files/uploads", "host": [ "{{baseUrl}}" ], "path": [ "v1", "files", "uploads" ] },
+						"description": "Dùng cho file lớn (ảnh/video) thay vì upload trực tiếp kèm API product. Trả uploadId + totalChunks — sửa fileSize/chunkSize theo file thật rồi gọi lại."
+					}
+				},
+				{
+					"name": "Upload Chunk",
+					"request": {
+						"method": "PUT",
+						"header": [ { "key": "Content-Type", "value": "application/octet-stream" } ],
+						"body": {
+							"mode": "file",
+							"file": {}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/v1/files/uploads/{{uploadId}}/chunks/0",
+							"host": [ "{{baseUrl}}" ],
+							"path": [ "v1", "files", "uploads", "{{uploadId}}", "chunks", "0" ]
+						},
+						"description": "Body = dữ liệu nhị phân thô của đoạn thứ 0 (0-based), kích thước đúng bằng chunkSize đã khai lúc init (đoạn cuối có thể ngắn hơn). Chọn file ở tab Body > binary. Đổi số '0' trong URL cho từng chunk; có thể gọi song song / không theo thứ tự."
+					}
+				},
+				{
+					"name": "Complete Chunked Upload",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"const body = pm.response.json();",
+									"if (body.data && body.data.id) {",
+									"    pm.collectionVariables.set('fileId', body.data.id);",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/v1/files/uploads/{{uploadId}}/complete",
+							"host": [ "{{baseUrl}}" ],
+							"path": [ "v1", "files", "uploads", "{{uploadId}}", "complete" ]
+						},
+						"description": "Ghép các đoạn thành file hoàn chỉnh, tạo bản ghi upload_file. Chỉ thành công khi đã nhận đủ tất cả các đoạn. fileId trả về dùng cho field 'fileIds' khi tạo/sửa product."
+					}
+				},
+				{
+					"name": "Abort Chunked Upload",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/v1/files/uploads/{{uploadId}}",
+							"host": [ "{{baseUrl}}" ],
+							"path": [ "v1", "files", "uploads", "{{uploadId}}" ]
+						},
+						"description": "Hủy upload dở dang, xóa phiên + dữ liệu tạm đã nhận."
+					}
+				}
+			]
+		}
+	]
+}

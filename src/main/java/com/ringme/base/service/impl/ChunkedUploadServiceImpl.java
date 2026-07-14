@@ -118,12 +118,22 @@ public class ChunkedUploadServiceImpl implements ChunkedUploadService {
         }
 
         long offset = (long) chunkIndex * session.chunkSize();
+        // Chặn trên: body của PUT là octet-stream thô (không phải multipart) nên
+        // spring.servlet.multipart.max-file-size KHÔNG áp dụng cho request này — nếu không tự chặn ở
+        // đây, 1 client gửi body vài GB vẫn bị ghi hết xuống đĩa trước khi complete() phát hiện sai lệch.
+        long expectedLength = Math.min(session.chunkSize(), session.fileSize() - offset);
         try (FileChannel channel = FileChannel.open(session.tempFilePath(),
                 StandardOpenOption.CREATE, StandardOpenOption.WRITE)) {
             byte[] buffer = new byte[COPY_BUFFER_SIZE];
             long position = offset;
+            long written = 0;
             int read;
             while ((read = chunkData.read(buffer)) != -1) {
+                written += read;
+                if (written > expectedLength) {
+                    throw new BusinessLogicException(AppCode.CODE_400,
+                            "Chunk " + chunkIndex + " exceeds expected size (" + expectedLength + " bytes)");
+                }
                 ByteBuffer byteBuffer = ByteBuffer.wrap(buffer, 0, read);
                 while (byteBuffer.hasRemaining()) {
                     position += channel.write(byteBuffer, position);
@@ -176,6 +186,16 @@ public class ChunkedUploadServiceImpl implements ChunkedUploadService {
         } catch (IOException e) {
             log.error("Finalize chunked upload failed | uploadId: {} | {}", uploadId, e.getMessage(), e);
             throw new BusinessLogicException(AppCode.CODE_500, "Cannot finalize upload");
+        }
+
+        try {
+            // Cũng như FileStorageServiceImpl#store: content-type client tự khai lúc init không đủ
+            // tin cậy -> đối chiếu chữ ký thật của file vừa ghép xong trước khi tạo bản ghi upload_file.
+            support.verifyMagicBytes(session.contentType(), targetFile);
+        } catch (BusinessLogicException e) {
+            deleteQuietly(targetFile);
+            sessions.invalidate(uploadId);
+            throw e;
         }
 
         UploadFile uploadFile = new UploadFile();

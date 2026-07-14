@@ -33,3 +33,6 @@ app:
     max-chunk-size: ${STORAGE_MAX_CHUNK_SIZE:20MB}
     chunk-session-ttl: ${STORAGE_CHUNK_SESSION_TTL:2h}
     max-chunk-sessions: ${STORAGE_MAX_CHUNK_SESSIONS:1000}
+    orphan-file-grace-period: ${STORAGE_ORPHAN_FILE_GRACE_PERIOD:24h}
+    orphan-cleanup-interval: ${STORAGE_ORPHAN_CLEANUP_INTERVAL:1h}
+    nginx-accel-redirect-enabled: ${STORAGE_NGINX_ACCEL_REDIRECT_ENABLED:false}
