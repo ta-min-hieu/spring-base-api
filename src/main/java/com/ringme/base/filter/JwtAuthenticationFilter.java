@@ -1,6 +1,6 @@
 package com.ringme.base.filter;
 
-import com.ringme.base.iam.security.PermissionEnrichmentService;
+import com.ringme.base.security.iam.PermissionEnrichmentService;
 import com.ringme.base.service.JwtAuthenticationService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
