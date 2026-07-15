@@ -8,6 +8,16 @@ services:
     environment:
       - 'KC_BOOTSTRAP_ADMIN_USERNAME=admin'
       - 'KC_BOOTSTRAP_ADMIN_PASSWORD=Hieu123456789a'
+      # Lưu vào Postgres thật (container "postgres" đứng riêng, xem docker/postgres/docker-compose.yml)
+      # thay vì dev-file/H2 mặc định của start-dev — dữ liệu bền hơn và xem/thao tác được bằng DB client
+      # bình thường. Không chung compose network với keycloak nên phải trỏ qua host.docker.internal.
+      - 'KC_DB=postgres'
+      - 'KC_DB_URL=jdbc:postgresql://host.docker.internal:5432/keycloak'
+      - 'KC_DB_USERNAME=dev'
+      - 'KC_DB_PASSWORD=Hieu123456789a'
+    extra_hosts:
+      # Linux Docker Engine không tự có host.docker.internal như Docker Desktop.
+      - "host.docker.internal:host-gateway"
     volumes:
       - keycloak_data:/opt/keycloak/data
 
