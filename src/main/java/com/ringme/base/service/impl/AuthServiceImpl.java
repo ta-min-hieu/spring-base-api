@@ -56,7 +56,10 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public GetTokensResponse handleRefreshToken(RefreshTokenRequest reqBody) {
-        // Xác thực refresh token và mang vai trò của người dùng sang cặp token mới được cấp.
+        // Xác thực refresh token TRƯỚC (chữ ký + type=refresh) rồi tra lại user trong DB — KHÔNG copy
+        // nguyên roles claim từ token cũ sang, nếu không tài khoản bị khoá (enabled=false) hoặc bị gỡ
+        // hết quyền qua PUT /v1/rbac/users/{userId}/roles vẫn refresh ra token mới với quyền CŨ, có
+        // hiệu lực cho tới khi refresh token tự hết hạn (mặc định 48h).
         Claims claims;
         try {
             claims = jwtProcessor.parseClaims(reqBody.getRefreshToken());
@@ -68,13 +71,19 @@ public class AuthServiceImpl implements AuthService {
             throw new BusinessLogicException(AppCode.TOKEN_INVALID, "Token is invalid");
         }
 
-        String subject = claims.getSubject();
-        Object roles = claims.get(ROLES_CLAIM);
-        Map<String, Object> newClaims = roles != null ? Map.of(ROLES_CLAIM, roles) : Map.of();
+        String username = claims.getSubject();
+        AppUser user = appUserRepository.findByUsername(username)
+                .filter(AppUser::getEnabled)
+                .orElseThrow(() -> {
+                    log.warn("Lượt refresh token của '{}' bị từ chối: user không tồn tại hoặc bị khóa", username);
+                    return new BusinessLogicException(AppCode.TOKEN_INVALID, "Token is invalid");
+                });
+        List<String> roles = resolveActiveRoleKeys(user);
 
+        Map<String, Object> newClaims = Map.of(ROLES_CLAIM, roles);
         return GetTokensResponse.builder()
-                .accessToken(jwtProcessor.generateAccessToken(subject, newClaims))
-                .refreshToken(jwtProcessor.generateRefreshToken(subject, newClaims))
+                .accessToken(jwtProcessor.generateAccessToken(username, newClaims))
+                .refreshToken(jwtProcessor.generateRefreshToken(username, newClaims))
                 .build();
     }
 
@@ -108,6 +117,10 @@ public class AuthServiceImpl implements AuthService {
             throw new BusinessLogicException(AppCode.CODE_401, "Invalid username or password");
         }
 
+        return resolveActiveRoleKeys(user);
+    }
+
+    private List<String> resolveActiveRoleKeys(AppUser user) {
         return userRoleRepository.findByUserId(user.getId()).stream()
                 .map(UserRole::getRole)
                 .filter(role -> role.getStatus() == CommonStatus.ACTIVE)

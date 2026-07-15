@@ -17,6 +17,6 @@ import lombok.NoArgsConstructor;
 public class UpdateUserRequest {
     private Boolean enabled;
 
-    @Size(min = 6, message = "password tối thiểu 6 ký tự")
+    @Size(min = 6, max = 100, message = "password 6-100 ký tự")
     private String password;
 }

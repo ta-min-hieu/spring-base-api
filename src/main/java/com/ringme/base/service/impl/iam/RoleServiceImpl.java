@@ -46,7 +46,7 @@ public class RoleServiceImpl implements RoleService {
 
         Role role = new Role();
         role.setRoleKey(request.getRoleKey());
-        applyMutableFields(role, request);
+        applyMutableFields(role, request, DataScope.ALL, CommonStatus.ACTIVE, 0);
         return RoleResponse.from(roleRepository.save(role));
     }
 
@@ -54,7 +54,10 @@ public class RoleServiceImpl implements RoleService {
     @Transactional
     public RoleResponse update(Long id, RoleRequest request) {
         Role role = findEntity(id);
-        applyMutableFields(role, request);
+        // Field null (dataScope/status/sortOrder) nghĩa là client không gửi -> GIỮ NGUYÊN giá trị hiện
+        // có, không phải "reset về default của create()" (vd 1 role đang DISABLED bị vô tình bật lại
+        // ACTIVE chỉ vì PUT thiếu field status).
+        applyMutableFields(role, request, role.getDataScope(), role.getStatus(), role.getSortOrder());
         RoleResponse response = RoleResponse.from(roleRepository.save(role));
         // roleName/description/dataScope/status/sortOrder không ảnh hưởng cache resource theo role_key,
         // nhưng status=DISABLED phải có hiệu lực ngay (RolePermissionRepository lọc theo r.status=ACTIVE).
@@ -74,12 +77,13 @@ public class RoleServiceImpl implements RoleService {
         menuCacheService.evictRole(roleKey);
     }
 
-    private void applyMutableFields(Role role, RoleRequest request) {
+    private void applyMutableFields(Role role, RoleRequest request,
+                                     DataScope dataScopeIfNull, CommonStatus statusIfNull, Integer sortOrderIfNull) {
         role.setRoleName(request.getRoleName());
         role.setDescription(request.getDescription());
-        role.setDataScope(request.getDataScope() != null ? request.getDataScope() : DataScope.ALL);
-        role.setStatus(request.getStatus() != null ? request.getStatus() : CommonStatus.ACTIVE);
-        role.setSortOrder(request.getSortOrder() != null ? request.getSortOrder() : 0);
+        role.setDataScope(request.getDataScope() != null ? request.getDataScope() : dataScopeIfNull);
+        role.setStatus(request.getStatus() != null ? request.getStatus() : statusIfNull);
+        role.setSortOrder(request.getSortOrder() != null ? request.getSortOrder() : sortOrderIfNull);
     }
 
     private Role findEntity(Long id) {

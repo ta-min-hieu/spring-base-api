@@ -18,10 +18,11 @@ import lombok.NoArgsConstructor;
         + "Gán role qua PUT /v1/rbac/users/{userId}/roles sau khi tạo.")
 public class CreateUserRequest {
     @NotBlank
+    @Size(max = 100, message = "username tối đa 100 ký tự")
     private String username;
 
     @NotBlank
-    @Size(min = 6, message = "password tối thiểu 6 ký tự")
+    @Size(min = 6, max = 100, message = "password 6-100 ký tự")
     private String password;
 
     private Boolean enabled;

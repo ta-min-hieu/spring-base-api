@@ -6,6 +6,7 @@ import com.ringme.base.enums.iam.MenuType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -21,12 +22,16 @@ public class MenuRequest {
     private Long parentId;
 
     @NotBlank
+    @Size(max = 100, message = "name tối đa 100 ký tự")
     private String name;
 
+    @Size(max = 255, message = "path tối đa 255 ký tự")
     private String path;
 
+    @Size(max = 255, message = "component tối đa 255 ký tự")
     private String component;
 
+    @Size(max = 100, message = "icon tối đa 100 ký tự")
     private String icon;
 
     @NotNull

@@ -46,7 +46,7 @@ public class PermissionServiceImpl implements PermissionService {
         }
 
         Permission permission = new Permission();
-        applyFields(permission, request);
+        applyFields(permission, request, CommonStatus.ACTIVE);
         PermissionResponse response = PermissionResponse.from(permissionRepository.save(permission));
         permissionCacheService.evictAll();
         return response;
@@ -59,7 +59,10 @@ public class PermissionServiceImpl implements PermissionService {
         assertCodeAvailable(request.getCode(), id);
         assertResourceAvailable(request.getHttpMethod(), request.getUrlPattern(), id);
 
-        applyFields(permission, request);
+        // status=null nghĩa là client không gửi field này -> GIỮ NGUYÊN giá trị hiện có, không phải
+        // "reset về ACTIVE". Trước đây dùng chung default của create(), khiến 1 permission đang DISABLED
+        // bị vô tình bật lại ACTIVE chỉ vì client PUT thiếu field status.
+        applyFields(permission, request, permission.getStatus());
         PermissionResponse response = PermissionResponse.from(permissionRepository.save(permission));
         permissionCacheService.evictAll();
         return response;
@@ -90,13 +93,13 @@ public class PermissionServiceImpl implements PermissionService {
         });
     }
 
-    private void applyFields(Permission permission, PermissionRequest request) {
+    private void applyFields(Permission permission, PermissionRequest request, CommonStatus statusIfNull) {
         permission.setCode(request.getCode());
         permission.setName(request.getName());
         permission.setHttpMethod(request.getHttpMethod());
         permission.setUrlPattern(request.getUrlPattern());
         permission.setDescription(request.getDescription());
-        permission.setStatus(request.getStatus() != null ? request.getStatus() : CommonStatus.ACTIVE);
+        permission.setStatus(request.getStatus() != null ? request.getStatus() : statusIfNull);
     }
 
     private Permission findEntity(Long id) {

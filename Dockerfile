@@ -12,9 +12,14 @@ RUN chmod +x mvnw && ./mvnw -B clean package -DskipTests
 # ---- Giai đoạn runtime: chỉ cần JRE 25 ----
 FROM eclipse-temurin:25-jre
 WORKDIR /app
+# Không chạy container bằng root — tạo user/group riêng (UID/GID cố định để khớp được với quyền thư
+# mục host khi bind-mount ./logs, ./storage trong docker-compose.yml; nếu host tạo sẵn 2 thư mục đó
+# với owner khác, cần chown lại trên host hoặc đổi UID này cho khớp).
+RUN groupadd --gid 1001 base && useradd --uid 1001 --gid base --no-create-home --shell /usr/sbin/nologin base
 # Dự án đóng gói dạng exploded jar: app.jar đi kèm thư mục lib/ (manifest Class-Path trỏ tới lib/).
-COPY --from=build /app/target/base-0.0.1.jar app.jar
-COPY --from=build /app/target/lib lib
+COPY --from=build --chown=base:base /app/target/base-0.0.1.jar app.jar
+COPY --from=build --chown=base:base /app/target/lib lib
+USER base
 # server.port mặc định 8386, context-path /base.
 EXPOSE 8386
 # Mặc định chạy profile dev. Production: truyền -e SPRING_PROFILES_ACTIVE=prod cùng các secret (xem .env.example).

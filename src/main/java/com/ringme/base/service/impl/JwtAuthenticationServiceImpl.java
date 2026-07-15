@@ -12,6 +12,7 @@ import com.ringme.base.security.JwtProcessor;
 import com.ringme.base.security.KeycloakJwtDecoderHolder;
 import com.ringme.base.service.JwtAuthenticationService;
 import io.jsonwebtoken.Claims;
+import lombok.extern.log4j.Log4j2;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.GrantedAuthority;
@@ -27,6 +28,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 @Component
+@Log4j2
 public class JwtAuthenticationServiceImpl implements JwtAuthenticationService {
 
     private static final String ROLE_PREFIX = "ROLE_";
@@ -86,8 +88,22 @@ public class JwtAuthenticationServiceImpl implements JwtAuthenticationService {
     private UsernamePasswordAuthenticationToken authenticateWithKeycloak(String token) {
         try {
             Jwt jwt = keycloakJwtDecoderHolder.decode(token);
+
+            // Keycloak ký CẢ access token (typ=Bearer) LẪN refresh token (typ=Refresh) bằng cùng key —
+            // JWKS chỉ xác minh được chữ ký hợp lệ, không tự phân biệt loại token. Không check riêng thì
+            // 1 refresh token (hoặc token của client Keycloak khác cùng realm) cũng qua được xác thực
+            // này, y hệt lỗ hổng mà TokenType.ACCESS.matches(...) đã chặn ở nhánh own-key bên dưới.
+            if (!"Bearer".equals(jwt.getClaimAsString("typ"))) {
+                return null;
+            }
+
             String username = resolveUsername(jwt);
-            return new UsernamePasswordAuthenticationToken(username, null, resolveKeycloakAuthorities(jwt, username));
+            Collection<GrantedAuthority> authorities = resolveKeycloakAuthorities(jwt, username);
+            if (authorities == null) {
+                // Username cục bộ đã link với 1 Keycloak subject KHÁC -> nghi vấn mạo danh, từ chối thẳng.
+                return null;
+            }
+            return new UsernamePasswordAuthenticationToken(username, null, authorities);
         } catch (JwtException e) {
             return null;
         }
@@ -129,13 +145,35 @@ public class JwtAuthenticationServiceImpl implements JwtAuthenticationService {
      * Keycloak, để admin gỡ hết role qua {@code PUT /v1/rbac/users/{userId}/roles} có hiệu lực khoá
      * user ngay lập tức. Chỉ dùng {@code realm_access.roles} của Keycloak khi username đó CHƯA có
      * trong app_user (identity thuần Keycloak, backend chưa quản lý).
+     *
+     * <p><b>preferred_username không đủ tin cậy để định danh 1 mình</b> — nó do Keycloak cấp và (tuỳ
+     * cấu hình realm) có thể trùng với 1 username cục bộ đã có sẵn mà không phải cùng 1 người. Vì vậy
+     * việc link được chốt lại bằng claim {@code sub} (UUID nội bộ, ổn định, không đổi được) qua
+     * {@code app_user.keycloak_subject}, theo mô hình trust-on-first-use: lần đăng nhập Keycloak đầu
+     * tiên của 1 username cục bộ CHƯA link thì tự gán cố định subject đó; các lần sau bắt buộc subject
+     * phải khớp. Trả về {@code null} (thay vì danh sách rỗng) để phân biệt "từ chối xác thực" với
+     * "xác thực OK nhưng không có role nào".
      */
     private Collection<GrantedAuthority> resolveKeycloakAuthorities(Jwt jwt, String username) {
-        Optional<AppUser> localUser = appUserRepository.findByUsername(username);
-        if (localUser.isEmpty()) {
+        Optional<AppUser> localUserOpt = appUserRepository.findByUsername(username);
+        if (localUserOpt.isEmpty()) {
             return extractKeycloakAuthorities(jwt);
         }
-        return userRoleRepository.findByUserId(localUser.get().getId()).stream()
+
+        AppUser localUser = localUserOpt.get();
+        String tokenSubject = jwt.getSubject();
+        String linkedSubject = localUser.getKeycloakSubject();
+        if (linkedSubject == null) {
+            localUser.setKeycloakSubject(tokenSubject);
+            appUserRepository.save(localUser);
+        } else if (!linkedSubject.equals(tokenSubject)) {
+            log.warn("KEYCLOAK IDENTITY MISMATCH | username: {} | app_user.keycloak_subject: {} | token sub: {} "
+                            + "-> từ chối, nghi vấn mạo danh username cục bộ",
+                    username, linkedSubject, tokenSubject);
+            return null;
+        }
+
+        return userRoleRepository.findByUserId(localUser.getId()).stream()
                 .map(UserRole::getRole)
                 .filter(role -> role.getStatus() == CommonStatus.ACTIVE)
                 .map(role -> (GrantedAuthority) new SimpleGrantedAuthority(ROLE_PREFIX + role.getRoleKey()))

@@ -16,6 +16,8 @@ public class UserResponse {
     private Long id;
     private String username;
     private Boolean enabled;
+    /** True nếu user đã từng đăng nhập qua Keycloak (đã chốt app_user.keycloak_subject) — xem AppUser. */
+    private Boolean keycloakLinked;
     @Builder.Default
     private List<RoleResponse> roles = List.of();
 
@@ -24,6 +26,7 @@ public class UserResponse {
                 .id(user.getId())
                 .username(user.getUsername())
                 .enabled(user.getEnabled())
+                .keycloakLinked(user.getKeycloakSubject() != null)
                 .roles(roles)
                 .build();
     }

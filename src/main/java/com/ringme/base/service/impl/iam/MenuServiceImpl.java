@@ -41,7 +41,7 @@ public class MenuServiceImpl implements MenuService {
     @Transactional
     public MenuResponse create(MenuRequest request) {
         Menu menu = new Menu();
-        applyFields(menu, request, null);
+        applyFields(menu, request, null, 0, Boolean.TRUE, CommonStatus.ACTIVE);
         MenuResponse response = MenuResponse.from(menuRepository.save(menu));
         menuCacheService.evictAll();
         return response;
@@ -51,7 +51,10 @@ public class MenuServiceImpl implements MenuService {
     @Transactional
     public MenuResponse update(Long id, MenuRequest request) {
         Menu menu = findEntity(id);
-        applyFields(menu, request, id);
+        // Field null (sortOrder/visible/status) nghĩa là client không gửi -> GIỮ NGUYÊN giá trị hiện
+        // có, không phải "reset về default của create()" (vd 1 menu đang ẩn/DISABLED bị vô tình bật
+        // lại visible=true/status=ACTIVE chỉ vì PUT thiếu field).
+        applyFields(menu, request, id, menu.getSortOrder(), menu.getVisible(), menu.getStatus());
         MenuResponse response = MenuResponse.from(menuRepository.save(menu));
         menuCacheService.evictAll();
         return response;
@@ -66,7 +69,8 @@ public class MenuServiceImpl implements MenuService {
         menuCacheService.evictAll();
     }
 
-    private void applyFields(Menu menu, MenuRequest request, Long selfId) {
+    private void applyFields(Menu menu, MenuRequest request, Long selfId,
+                              Integer sortOrderIfNull, Boolean visibleIfNull, CommonStatus statusIfNull) {
         validateParent(request.getParentId(), selfId);
         menu.setParentId(request.getParentId());
         menu.setName(request.getName());
@@ -74,9 +78,9 @@ public class MenuServiceImpl implements MenuService {
         menu.setComponent(request.getComponent());
         menu.setIcon(request.getIcon());
         menu.setMenuType(request.getMenuType());
-        menu.setSortOrder(request.getSortOrder() != null ? request.getSortOrder() : 0);
-        menu.setVisible(request.getVisible() != null ? request.getVisible() : Boolean.TRUE);
-        menu.setStatus(request.getStatus() != null ? request.getStatus() : CommonStatus.ACTIVE);
+        menu.setSortOrder(request.getSortOrder() != null ? request.getSortOrder() : sortOrderIfNull);
+        menu.setVisible(request.getVisible() != null ? request.getVisible() : visibleIfNull);
+        menu.setStatus(request.getStatus() != null ? request.getStatus() : statusIfNull);
     }
 
     /** parentId phải tồn tại, và (khi update) KHÔNG được là chính node đó hoặc 1 trong các node con của nó. */

@@ -27,6 +27,8 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -93,6 +95,7 @@ class JwtAuthenticationServiceImplTest {
         Jwt jwt = Jwt.withTokenValue(token)
                 .header("alg", "RS256")
                 .subject("kc-user")
+                .claim("typ", "Bearer")
                 .claim("realm_access", Map.of("roles", List.of("USER")))
                 .issuedAt(Instant.now())
                 .expiresAt(Instant.now().plusSeconds(60))
@@ -103,6 +106,26 @@ class JwtAuthenticationServiceImplTest {
 
         assertEquals("kc-user", auth.getPrincipal());
         assertTrue(auth.getAuthorities().stream().map(GrantedAuthority::getAuthority).toList().contains("ROLE_USER"));
+    }
+
+    @Test
+    void keycloakRefreshToken_isRejected_evenWithValidSignature() {
+        // Keycloak ký refresh token bằng CÙNG key với access token (typ=Refresh thay vì Bearer) —
+        // JWKS verify chữ ký thành công nhưng KHÔNG được chấp nhận làm access token.
+        String token = "keycloak-refresh-token";
+        when(jwtProcessor.validate(token)).thenReturn(false);
+        when(keycloakProperties.isEnabled()).thenReturn(true);
+
+        Jwt jwt = Jwt.withTokenValue(token)
+                .header("alg", "HS512")
+                .subject("kc-user")
+                .claim("typ", "Refresh")
+                .issuedAt(Instant.now())
+                .expiresAt(Instant.now().plusSeconds(60))
+                .build();
+        when(keycloakJwtDecoderHolder.decode(token)).thenReturn(jwt);
+
+        assertNull(service.authenticate(token));
     }
 
     @Test
@@ -128,6 +151,7 @@ class JwtAuthenticationServiceImplTest {
         Jwt jwt = Jwt.withTokenValue(token)
                 .header("alg", "RS256")
                 .subject("kc-user")
+                .claim("typ", "Bearer")
                 .claim("realm_access", Map.of("roles", List.of("USER"))) // phải bị bỏ qua
                 .issuedAt(Instant.now())
                 .expiresAt(Instant.now().plusSeconds(60))
@@ -164,6 +188,7 @@ class JwtAuthenticationServiceImplTest {
         Jwt jwt = Jwt.withTokenValue(token)
                 .header("alg", "RS256")
                 .subject("770e67e3-7b4a-42a0-af26-57dd2ab275e9")
+                .claim("typ", "Bearer")
                 .claim("preferred_username", "testuser")
                 .claim("realm_access", Map.of("roles", List.of("USER"))) // phải bị bỏ qua
                 .issuedAt(Instant.now())
@@ -177,6 +202,103 @@ class JwtAuthenticationServiceImplTest {
         List<String> authorities = auth.getAuthorities().stream().map(GrantedAuthority::getAuthority).toList();
         assertTrue(authorities.contains("ROLE_ADMIN"));
         assertFalse(authorities.contains("ROLE_USER"));
+    }
+
+    @Test
+    void keycloakToken_linksSubjectOnFirstLogin_whenAppUserNotYetLinked() {
+        // app_user "kc-user" chưa từng đăng nhập qua Keycloak (keycloakSubject == null) -> lần đầu
+        // tiên tự chốt (trust-on-first-use) app_user.keycloak_subject = sub của token này.
+        String token = "keycloak-access-token";
+        when(jwtProcessor.validate(token)).thenReturn(false);
+        when(keycloakProperties.isEnabled()).thenReturn(true);
+
+        AppUser localUser = new AppUser();
+        localUser.setId(7L);
+        localUser.setUsername("kc-user");
+        when(appUserRepository.findByUsername("kc-user")).thenReturn(Optional.of(localUser));
+        when(userRoleRepository.findByUserId(7L)).thenReturn(List.of());
+
+        Jwt jwt = Jwt.withTokenValue(token)
+                .header("alg", "RS256")
+                .subject("keycloak-uuid-111")
+                .claim("typ", "Bearer")
+                .claim("preferred_username", "kc-user")
+                .issuedAt(Instant.now())
+                .expiresAt(Instant.now().plusSeconds(60))
+                .build();
+        when(keycloakJwtDecoderHolder.decode(token)).thenReturn(jwt);
+
+        UsernamePasswordAuthenticationToken auth = service.authenticate(token);
+
+        assertEquals("kc-user", auth.getPrincipal());
+        assertEquals("keycloak-uuid-111", localUser.getKeycloakSubject());
+        verify(appUserRepository).save(localUser);
+    }
+
+    @Test
+    void keycloakToken_isRejected_whenSubjectDoesNotMatchAlreadyLinkedUser() {
+        // app_user "admin" ĐÃ link với subject "real-admin-uuid" từ trước. Một identity Keycloak KHÁC
+        // ("attacker-uuid") có preferred_username trùng "admin" KHÔNG được thừa kế quyền của app_user
+        // đó — đây chính là lỗ hổng mạo danh cần chặn.
+        String token = "keycloak-access-token";
+        when(jwtProcessor.validate(token)).thenReturn(false);
+        when(keycloakProperties.isEnabled()).thenReturn(true);
+
+        AppUser localUser = new AppUser();
+        localUser.setId(1L);
+        localUser.setUsername("admin");
+        localUser.setKeycloakSubject("real-admin-uuid");
+        when(appUserRepository.findByUsername("admin")).thenReturn(Optional.of(localUser));
+
+        Jwt jwt = Jwt.withTokenValue(token)
+                .header("alg", "RS256")
+                .subject("attacker-uuid")
+                .claim("typ", "Bearer")
+                .claim("preferred_username", "admin")
+                .issuedAt(Instant.now())
+                .expiresAt(Instant.now().plusSeconds(60))
+                .build();
+        when(keycloakJwtDecoderHolder.decode(token)).thenReturn(jwt);
+
+        assertNull(service.authenticate(token));
+        verify(appUserRepository, never()).save(localUser);
+        verify(userRoleRepository, never()).findByUserId(1L);
+    }
+
+    @Test
+    void keycloakToken_isAccepted_whenSubjectMatchesAlreadyLinkedUser() {
+        String token = "keycloak-access-token";
+        when(jwtProcessor.validate(token)).thenReturn(false);
+        when(keycloakProperties.isEnabled()).thenReturn(true);
+
+        AppUser localUser = new AppUser();
+        localUser.setId(1L);
+        localUser.setUsername("admin");
+        localUser.setKeycloakSubject("real-admin-uuid");
+        when(appUserRepository.findByUsername("admin")).thenReturn(Optional.of(localUser));
+
+        Role adminRole = new Role();
+        adminRole.setRoleKey("ADMIN");
+        adminRole.setStatus(CommonStatus.ACTIVE);
+        UserRole userRole = new UserRole();
+        userRole.setRole(adminRole);
+        when(userRoleRepository.findByUserId(1L)).thenReturn(List.of(userRole));
+
+        Jwt jwt = Jwt.withTokenValue(token)
+                .header("alg", "RS256")
+                .subject("real-admin-uuid")
+                .claim("typ", "Bearer")
+                .claim("preferred_username", "admin")
+                .issuedAt(Instant.now())
+                .expiresAt(Instant.now().plusSeconds(60))
+                .build();
+        when(keycloakJwtDecoderHolder.decode(token)).thenReturn(jwt);
+
+        UsernamePasswordAuthenticationToken auth = service.authenticate(token);
+
+        assertEquals("admin", auth.getPrincipal());
+        assertTrue(auth.getAuthorities().stream().map(GrantedAuthority::getAuthority).toList().contains("ROLE_ADMIN"));
+        verify(appUserRepository, never()).save(localUser);
     }
 
     @Test

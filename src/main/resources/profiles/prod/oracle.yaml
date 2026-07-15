@@ -1,0 +1,29 @@
+# ============================== Oracle (JPA Hibernate) — PROD ==============================
+# Cùng datasource cho cả 2 schema (dev_e_commerce: Product/UploadFile; dev_iam: User/RBAC/Menu, xem
+# entity @Table(schema=...)) — user kết nối cần GRANT cross-schema trên dev_iam.* (xem sql/oracle/iam.sql).
+# Không có default cho username/password/url — thiếu biến môi trường BẮT BUỘC phải fail khi khởi động
+# thay vì âm thầm dùng giá trị dev/uat.
+spring:
+  datasource:
+    url: ${DB_DWH_URL}
+    username: ${DB_DWH_USERNAME}
+    password: ${DB_DWH_PASSWORD}
+    driver-class-name: oracle.jdbc.OracleDriver
+    hikari:
+      connectionTimeout: 30000
+      idleTimeout: 30000
+      maxLifetime: 2000000
+      maximumPoolSize: 100
+      minimumIdle: 10
+      poolName: HikariCP
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: none
+    database-platform: org.hibernate.dialect.OracleDialect
+    show-sql: false
+
+management:
+  health:
+    db:
+      enabled: true

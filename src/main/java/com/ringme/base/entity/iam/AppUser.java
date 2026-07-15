@@ -34,4 +34,17 @@ public class AppUser {
 
     @Column(nullable = false)
     private Boolean enabled;
+
+    /**
+     * Claim {@code sub} (UUID nội bộ, ổn định) của identity Keycloak đã đăng nhập THÀNH CÔNG lần đầu
+     * với username này — gán theo mô hình trust-on-first-use ở
+     * {@link com.ringme.base.service.impl.JwtAuthenticationServiceImpl}. NULL = chưa từng đăng nhập
+     * qua Keycloak. Có UNIQUE INDEX ở DB để 1 identity Keycloak không link được vào 2 app_user khác
+     * nhau. Mục đích: {@code preferred_username} do Keycloak cấp KHÔNG đủ tin cậy để định danh 1 mình
+     * — nếu 1 username cục bộ (vd "admin") đã từng link với 1 subject, lần đăng nhập sau bằng
+     * preferred_username trùng tên nhưng subject KHÁC (identity Keycloak khác) sẽ bị từ chối thẳng
+     * thay vì được "thừa kế" quyền của app_user đó.
+     */
+    @Column(name = "keycloak_subject")
+    private String keycloakSubject;
 }
