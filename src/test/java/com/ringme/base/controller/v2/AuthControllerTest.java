@@ -1,6 +1,7 @@
 package com.ringme.base.controller.v2;
 
 import com.ringme.base.dto.app.request.LoginRequest;
+import com.ringme.base.dto.app.request.RefreshTokenRequest;
 import com.ringme.base.dto.app.response.GetTokensResponse;
 import com.ringme.base.enums.AppCode;
 import com.ringme.base.exception.BusinessLogicException;
@@ -65,6 +66,42 @@ class AuthControllerTest {
         mockMvc.perform(post("/v2/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"username\":\"\",\"password\":\"\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("400"));
+    }
+
+    @Test
+    void refreshToken_returnsNewTokenPair_onSuccess() throws Exception {
+        when(keycloakAuthService.refreshToken(any(RefreshTokenRequest.class))).thenReturn(
+                GetTokensResponse.builder().accessToken("kc-access-2").refreshToken("kc-refresh-2").build()
+        );
+
+        mockMvc.perform(post("/v2/auth/refresh-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\":\"kc-refresh\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("200"))
+                .andExpect(jsonPath("$.data.accessToken").value("kc-access-2"))
+                .andExpect(jsonPath("$.data.refreshToken").value("kc-refresh-2"));
+    }
+
+    @Test
+    void refreshToken_returns401_onInvalidOrExpiredToken() throws Exception {
+        when(keycloakAuthService.refreshToken(any(RefreshTokenRequest.class)))
+                .thenThrow(new BusinessLogicException(AppCode.CODE_401, "Invalid or expired refresh token"));
+
+        mockMvc.perform(post("/v2/auth/refresh-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\":\"expired\"}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("401"));
+    }
+
+    @Test
+    void refreshToken_rejectsBlankField() throws Exception {
+        mockMvc.perform(post("/v2/auth/refresh-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\":\"\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("400"));
     }

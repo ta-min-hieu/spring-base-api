@@ -50,4 +50,21 @@ public class KeycloakAuthClient extends RestAbstractHttpClient {
                 KeycloakTokenResponse.class
         );
     }
+
+    /** Cấp lại cặp token từ refresh token do Keycloak phát hành — dùng cho POST /v2/auth/refresh-token. */
+    public ResponseEntity<KeycloakTokenResponse> requestRefreshGrantToken(String refreshToken) {
+        MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+        form.add("grant_type", "refresh_token");
+        form.add("client_id", keycloakProperties.getClientId());
+        form.add("client_secret", keycloakProperties.getClientSecret());
+        form.add("refresh_token", refreshToken);
+
+        return exchangeRaw(
+                keycloakProperties.tokenEndpoint(),
+                HttpMethod.POST,
+                form,
+                null,
+                KeycloakTokenResponse.class
+        );
+    }
 }

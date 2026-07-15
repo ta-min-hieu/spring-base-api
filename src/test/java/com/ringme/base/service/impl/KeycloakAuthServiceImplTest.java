@@ -3,6 +3,7 @@ package com.ringme.base.service.impl;
 import com.ringme.base.client.KeycloakAuthClient;
 import com.ringme.base.config.security.KeycloakProperties;
 import com.ringme.base.dto.app.request.LoginRequest;
+import com.ringme.base.dto.app.request.RefreshTokenRequest;
 import com.ringme.base.dto.app.response.GetTokensResponse;
 import com.ringme.base.dto.app.response.KeycloakTokenResponse;
 import com.ringme.base.enums.AppCode;
@@ -71,6 +72,46 @@ class KeycloakAuthServiceImplTest {
 
         BusinessLogicException ex = assertThrows(BusinessLogicException.class,
                 () -> service.login(new LoginRequest("user01", "secret")));
+        assertEquals(AppCode.CODE_404, ex.getCode());
+    }
+
+    @Test
+    void refreshToken_returnsNewTokenPair_onSuccess() {
+        when(keycloakProperties.isEnabled()).thenReturn(true);
+
+        KeycloakTokenResponse body = new KeycloakTokenResponse();
+        body.setAccessToken("kc-access-2");
+        body.setRefreshToken("kc-refresh-2");
+        when(keycloakAuthClient.requestRefreshGrantToken("kc-refresh"))
+                .thenReturn(ResponseEntity.ok(body));
+
+        GetTokensResponse tokens = service.refreshToken(new RefreshTokenRequest("kc-refresh"));
+
+        assertEquals("kc-access-2", tokens.getAccessToken());
+        assertEquals("kc-refresh-2", tokens.getRefreshToken());
+    }
+
+    @Test
+    void refreshToken_throws401_onExpiredOrRevokedToken() {
+        when(keycloakProperties.isEnabled()).thenReturn(true);
+
+        KeycloakTokenResponse body = new KeycloakTokenResponse();
+        body.setError("invalid_grant");
+        body.setErrorDescription("Token is not active");
+        when(keycloakAuthClient.requestRefreshGrantToken(anyString()))
+                .thenReturn(ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body));
+
+        BusinessLogicException ex = assertThrows(BusinessLogicException.class,
+                () -> service.refreshToken(new RefreshTokenRequest("expired-refresh")));
+        assertEquals(AppCode.CODE_401, ex.getCode());
+    }
+
+    @Test
+    void refreshToken_throws404_whenKeycloakDisabled() {
+        when(keycloakProperties.isEnabled()).thenReturn(false);
+
+        BusinessLogicException ex = assertThrows(BusinessLogicException.class,
+                () -> service.refreshToken(new RefreshTokenRequest("kc-refresh")));
         assertEquals(AppCode.CODE_404, ex.getCode());
     }
 }

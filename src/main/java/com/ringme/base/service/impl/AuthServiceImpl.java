@@ -4,10 +4,14 @@ import com.ringme.base.dto.app.request.LoginRequest;
 import com.ringme.base.dto.app.request.RefreshTokenRequest;
 import com.ringme.base.dto.app.response.GetTokensResponse;
 import com.ringme.base.entity.AppUser;
+import com.ringme.base.entity.Role;
+import com.ringme.base.entity.UserRole;
 import com.ringme.base.enums.AppCode;
+import com.ringme.base.enums.CommonStatus;
 import com.ringme.base.enums.TokenType;
 import com.ringme.base.exception.BusinessLogicException;
 import com.ringme.base.repository.AppUserRepository;
+import com.ringme.base.repository.UserRoleRepository;
 import com.ringme.base.security.JwtProcessor;
 import com.ringme.base.service.AuthService;
 import io.jsonwebtoken.Claims;
@@ -18,7 +22,6 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -32,6 +35,7 @@ public class AuthServiceImpl implements AuthService {
 
     private final JwtProcessor jwtProcessor;
     private final AppUserRepository appUserRepository;
+    private final UserRoleRepository userRoleRepository;
     private final PasswordEncoder passwordEncoder;
 
     /**
@@ -86,7 +90,9 @@ public class AuthServiceImpl implements AuthService {
 
     /**
      * Kiểm tra thông tin đăng nhập dựa trên bảng {@code dev_e_commerce.app_user}: so khớp password
-     * đã hash (BCrypt) và trả về danh sách role của user để đưa vào claim "roles" của JWT.
+     * đã hash (BCrypt) và trả về danh sách role_key (module RBAC, bảng {@code user_role}) để đưa vào
+     * claim "roles" của JWT — đây là nguồn DUY NHẤT xác định role của user ở lần đăng nhập, khớp với
+     * gán quyền qua {@code PUT /v1/rbac/users/{userId}/roles} (UserRoleController).
      */
     private List<String> authenticateCredentials(LoginRequest request) {
         AppUser user = appUserRepository.findByUsername(request.getUsername())
@@ -102,6 +108,10 @@ public class AuthServiceImpl implements AuthService {
             throw new BusinessLogicException(AppCode.CODE_401, "Invalid username or password");
         }
 
-        return new ArrayList<>(user.getRoles());
+        return userRoleRepository.findByUserId(user.getId()).stream()
+                .map(UserRole::getRole)
+                .filter(role -> role.getStatus() == CommonStatus.ACTIVE)
+                .map(Role::getRoleKey)
+                .toList();
     }
 }

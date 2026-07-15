@@ -1,6 +1,7 @@
 package com.ringme.base.controller.v2;
 
 import com.ringme.base.dto.app.request.LoginRequest;
+import com.ringme.base.dto.app.request.RefreshTokenRequest;
 import com.ringme.base.dto.app.response.GetTokensResponse;
 import com.ringme.base.dto.app.response.common.Response;
 import com.ringme.base.enums.AppCode;
@@ -32,5 +33,15 @@ public class AuthController {
     public Response<GetTokensResponse> handleLogin(@Valid @RequestBody LoginRequest reqBody) {
         log.info("LOGIN V2 (KEYCLOAK) REQUEST | username: {}", reqBody.getUsername());
         return AppCode.CODE_200.getResponse(keycloakAuthService.login(reqBody));
+    }
+
+    @Operation(
+            summary = "Refresh token qua Keycloak",
+            description = "Cấp lại access token và refresh token từ refresh token do Keycloak phát hành trước đó."
+    )
+    @PostMapping("/refresh-token")
+    public Response<GetTokensResponse> handleRefreshToken(@Valid @RequestBody RefreshTokenRequest reqBody) {
+        log.info("REFRESH TOKEN V2 (KEYCLOAK) REQUEST");
+        return AppCode.CODE_200.getResponse(keycloakAuthService.refreshToken(reqBody));
     }
 }
