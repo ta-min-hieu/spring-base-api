@@ -1,13 +1,13 @@
 package com.ringme.base.service.impl;
 
 import com.ringme.base.config.security.KeycloakProperties;
-import com.ringme.base.entity.AppUser;
-import com.ringme.base.entity.Role;
-import com.ringme.base.entity.UserRole;
-import com.ringme.base.enums.CommonStatus;
+import com.ringme.base.iam.entity.AppUser;
+import com.ringme.base.iam.entity.Role;
+import com.ringme.base.iam.entity.UserRole;
+import com.ringme.base.iam.enums.CommonStatus;
 import com.ringme.base.enums.TokenType;
-import com.ringme.base.repository.AppUserRepository;
-import com.ringme.base.repository.UserRoleRepository;
+import com.ringme.base.iam.repository.AppUserRepository;
+import com.ringme.base.iam.repository.UserRoleRepository;
 import com.ringme.base.security.JwtProcessor;
 import com.ringme.base.security.KeycloakJwtDecoderHolder;
 import com.ringme.base.service.JwtAuthenticationService;
@@ -124,7 +124,7 @@ public class JwtAuthenticationServiceImpl implements JwtAuthenticationService {
 
     /**
      * Vai trò của user đăng nhập qua Keycloak: nếu username (claim {@code preferred_username}) khớp 1
-     * {@code app_user} cục bộ, module RBAC ({@code dev_e_commerce.user_role}) là nguồn DUY NHẤT — kể
+     * {@code app_user} cục bộ, module RBAC ({@code dev_iam.user_role}) là nguồn DUY NHẤT — kể
      * cả khi user đó KHÔNG có role nào được gán (danh sách rỗng), KHÔNG rơi về realm_access.roles của
      * Keycloak, để admin gỡ hết role qua {@code PUT /v1/rbac/users/{userId}/roles} có hiệu lực khoá
      * user ngay lập tức. Chỉ dùng {@code realm_access.roles} của Keycloak khi username đó CHƯA có

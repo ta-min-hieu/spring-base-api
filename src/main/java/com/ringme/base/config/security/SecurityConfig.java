@@ -1,6 +1,7 @@
 package com.ringme.base.config.security;
 
-import com.ringme.base.filter.DynamicPermissionFilter;
+import com.ringme.base.iam.config.RbacAccessDeniedHandler;
+import com.ringme.base.iam.filter.DynamicPermissionFilter;
 import com.ringme.base.filter.JwtAuthenticationFilter;
 import com.ringme.base.security.JwtProcessor;
 import com.ringme.base.security.RsaKeyLoader;

@@ -1,11 +1,11 @@
 package com.ringme.base.controller.v1;
 
 import com.ringme.base.config.rest.RateLimitProperties;
-import com.ringme.base.config.security.RbacAccessDeniedHandler;
+import com.ringme.base.iam.config.RbacAccessDeniedHandler;
 import com.ringme.base.config.storage.StorageProperties;
 import com.ringme.base.entity.UploadFile;
 import com.ringme.base.enums.FileCategory;
-import com.ringme.base.security.PermissionEnrichmentService;
+import com.ringme.base.iam.security.PermissionEnrichmentService;
 import com.ringme.base.service.ChunkedUploadService;
 import com.ringme.base.service.FileStorageService;
 import com.ringme.base.service.JwtAuthenticationService;

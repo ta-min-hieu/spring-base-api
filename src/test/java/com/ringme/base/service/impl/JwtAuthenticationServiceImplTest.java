@@ -1,12 +1,12 @@
 package com.ringme.base.service.impl;
 
 import com.ringme.base.config.security.KeycloakProperties;
-import com.ringme.base.entity.AppUser;
-import com.ringme.base.entity.Role;
-import com.ringme.base.entity.UserRole;
-import com.ringme.base.enums.CommonStatus;
-import com.ringme.base.repository.AppUserRepository;
-import com.ringme.base.repository.UserRoleRepository;
+import com.ringme.base.iam.entity.AppUser;
+import com.ringme.base.iam.entity.Role;
+import com.ringme.base.iam.entity.UserRole;
+import com.ringme.base.iam.enums.CommonStatus;
+import com.ringme.base.iam.repository.AppUserRepository;
+import com.ringme.base.iam.repository.UserRoleRepository;
 import com.ringme.base.security.JwtProcessor;
 import com.ringme.base.security.KeycloakJwtDecoderHolder;
 import org.junit.jupiter.api.BeforeEach;
