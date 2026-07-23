@@ -1,6 +1,6 @@
 # AGENTS.md — Quy tắc cho agent khi làm việc trên dự án này
 
-Tài liệu này dành cho AI agent (và lập trình viên) làm việc với codebase **`com.ringme.base`** — một base/skeleton Spring Boot 4.1 / Java 25 (nhánh `spring/base/4.0-jdk25`, migrate từ bản Boot 3.5 / Java 21) để clone ra dự án mới. Đọc kèm `CLAUDE.md` (mô tả kiến trúc chi tiết). Khi mâu thuẫn, **chỉ dẫn trực tiếp của người dùng > AGENTS.md > mặc định**.
+Tài liệu này dành cho AI agent (và lập trình viên) làm việc với codebase **`com.ringme.base`** — một base/skeleton Spring Boot 4.1 / Java 25 (nhánh `spring/base/4.0-jdk25-full`, migrate từ bản Boot 3.5 / Java 21) để clone ra dự án mới. Phân vai với `CLAUDE.md`: `CLAUDE.md` mô tả **cái gì đang tồn tại & vì sao** (kiến trúc, facts); file này là **quy tắc bắt buộc khi code** — hai file bổ trợ nhau, không lặp nội dung. Khi mâu thuẫn, **chỉ dẫn trực tiếp của người dùng > AGENTS.md > mặc định**.
 
 **Lưu ý:** repo NÀY (bản đang mở) đã đi quá phần "skeleton trống" — đã có domain Product (schema `dev_e_commerce`) và module IAM/RBAC đầy đủ (User/Role/Permission/Menu, schema `dev_iam`, cả login Keycloak song song) chạy trên Oracle. Mục A bên dưới là checklist khi CLONE base này ra dự án mới, không phải mô tả trạng thái hiện tại của repo này — xem `CLAUDE.md` mục **"What this is"**, **"IAM / RBAC module"**, **"Oracle: two schemas, one datasource"** cho trạng thái thật.
 
@@ -47,6 +47,7 @@ Checklist bắt buộc (thiếu bước nào là dự án chưa chạy đúng/an
 - **Logging**: dùng Log4j2 (`@Log4j2` của Lombok), KHÔNG dùng Logback. **Không log dữ liệu nhạy cảm** — request/response log đã đi qua `LogMasker`; nếu tự log thêm, đừng in `Authorization`, password, token thô.
 - **Dependency injection**: ưu tiên constructor injection qua `@RequiredArgsConstructor` trên field `final`.
 - **Validation**: dùng `@Valid` / `@Validated`; lỗi tự được `GlobalExceptionHandler` gom thành `{field: [messages]}` với HTTP 400 — không cần tự bắt.
+- **Enum làm request param**: viết converter trong `converter/request` theo mẫu `StatusEnumConverter`/`ProductStatusEnumConverter` — `@Component implements Converter<String, E>`, giá trị không hợp lệ thì log + trả `null` (param coi như không truyền, KHÔNG ném lỗi 400 cho cả request).
 - **Comment/mô tả tiếng Việt**, khớp văn phong các comment xung quanh.
 - **Bố cục package theo concern**: `config/` (mỗi concern một subpackage), `controller/vN`, `service` + `service/impl`, `dto/app/{request,response}`, `enums`, `exception`, `filter`, `security`, `client`, `context`, `converter`, `utils`. Riêng module IAM là NGOẠI LỆ: nhóm theo domain thay vì theo version — subfolder `iam` NẰM TRONG từng layer (`controller/iam`, `service/impl/iam`, `entity/iam`, ...), không theo `controller/vN`. Thêm class IAM mới thì đặt đúng subfolder `iam` tương ứng, không đặt lẫn vào `controller/v1`.
 
@@ -101,7 +102,7 @@ Checklist bắt buộc (thiếu bước nào là dự án chưa chạy đúng/an
 - **Cache local Caffeine** (`CaffeineConfig`, LUÔN bật, tên `CacheManager.CAFFEINE`): map TTL theo `KeyCache` GIỐNG Redis. Là cache MẶC ĐỊNH khi tắt Redis; khi bật Redis thì Redis là primary, Caffeine vẫn dùng qua tên cho cache local nóng.
 - Dùng cache: `@Cacheable(value = KeyCache.CacheName.XXX)` (mặc định/primary). Muốn ép cache local: thêm `cacheManager = CacheManager.CAFFEINE`. Thêm cache mới → thêm hằng vào `KeyCache` (TTL = `null` ⇒ dùng TTL mặc định); cả Redis lẫn Caffeine đều tự nhận.
 - Khóa phân tán: inject `RedisDistributedService`, gọi `getDistributedLock(key)` rồi `tryLock(...)/unlock()`.
-- `KeyCache` để TRỐNG sẵn (skeleton) — dự án tự thêm cache key. Test tích hợp `RedisIntegrationTest` dùng **Testcontainers** (Redis thật trong Docker; KHÔNG có Docker thì tự bỏ qua nên `mvnw test` vẫn xanh).
+- `KeyCache` gốc để trống (skeleton) nhưng repo này ĐÃ thêm `ROLE_PERMISSIONS`/`ROLE_MENUS` (TTL 6h, phục vụ IAM) — thêm cache mới thì thêm hằng tiếp vào đây, đừng tạo tên cache rời. Test tích hợp `RedisIntegrationTest` dùng **Testcontainers** (Redis thật trong Docker; KHÔNG có Docker thì tự bỏ qua nên `mvnw test` vẫn xanh).
 
 ### B-infra. Infra bên thứ 3 (MySQL, MongoDB, RabbitMQ, Kafka) — OPT-IN, mặc định TẮT
 
@@ -109,7 +110,7 @@ Checklist bắt buộc (thiếu bước nào là dự án chưa chạy đúng/an
 
 - Mỗi infra một file `profiles/<profile>/<tên>.yaml`, dùng **cấu hình gốc của Spring** (KHÔNG bọc qua `app.*`); mọi giá trị override được qua env, có default hợp lý. Mỗi file có khối **standalone** đầy đủ + khối **cluster/HA comment sẵn** (bỏ comment khi cần).
 - **Mặc định TẮT mà base vẫn build/test/chạy**: client kết nối LƯỜI và base KHÔNG khai báo listener/entity nào. Health indicator gate theo cờ để `/actuator/health` UP khi tắt.
-- Đường BẬT kiểm chứng bằng Testcontainers thật ở `src/test/java/com/ringme/base/infra/` (`mysql:8.0`/`mongo:7`/`rabbitmq:3.13-management-alpine`/`apache/kafka:3.8.1`), tự bỏ qua (`assumeTrue`) khi KHÔNG có Docker → `mvnw test` vẫn xanh.
+- Đường BẬT kiểm chứng bằng Testcontainers thật ở `src/test/java/com/ringme/base/infra/` (`mongo:7`/`rabbitmq:3.13-management-alpine`/`apache/kafka:3.8.1` — MySQL không còn test vì đã thay bằng Oracle), tự bỏ qua (`assumeTrue`) khi KHÔNG có Docker → `mvnw test` vẫn xanh.
 - **MySQL — đã bị thay bằng Oracle trong repo này, gần như không còn dùng.** Cơ chế gốc: TẮT bằng cách LOẠI `DataSourceAutoConfiguration` (`spring.autoconfigure.exclude`, env `MYSQL_AUTOCONFIGURE_EXCLUDE`) → JdbcTemplate/JPA/repository tự backs-off; BẬT bằng để env đó rỗng + creds + `MYSQL_ENABLED=true`. Boot 4 FQN: `org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration`. Health: `management.health.db.enabled`. Repo này đã xoá `mysql.yaml` khỏi mọi profile (dev chưa từng có; uat/prod xoá vì tranh bean `DataSource` duy nhất với `oracle.yaml`) và comment `mysql-connector-j` trong `pom.xml` — xem `oracle.yaml` (mỗi profile) + CLAUDE.md mục "Oracle: two schemas, one datasource" cho datasource THẬT đang dùng.
 - **MongoDB** (`spring-boot-starter-data-mongodb`): **Boot 4 ĐỔI prefix `spring.data.mongodb.*` → `spring.mongodb.*`** (`MongoProperties` về `org.springframework.boot.mongodb.autoconfigure`); dùng prefix cũ sẽ âm thầm fallback `localhost:27017`. `uri` PHẢI kèm tên database, không Boot 4 báo "Database name must not be empty". BẬT: `MONGODB_ENABLED=true` + `MONGODB_URI`. Health: `management.health.mongodb.enabled` (Boot 4 đổi `mongo`→`mongodb`).
 - **RabbitMQ/AMQP** (`spring-boot-starter-amqp`): kết nối lười, base không có `@RabbitListener`. BẬT: `RABBITMQ_ENABLED=true` + host/creds. Cluster = `spring.rabbitmq.addresses`. Health: `management.health.rabbit.enabled`.
@@ -159,8 +160,10 @@ Checklist bắt buộc (thiếu bước nào là dự án chưa chạy đúng/an
   ./mvnw clean package            # đóng gói exploded jar + lib/
   docker compose up --build -d    # build + chạy bằng Docker (mặc định profile dev)
   ```
+- **Docker**: compose gốc KHÔNG publish port — điểm vào duy nhất là nginx dùng chung ở `E:/study/shared-nginx` qua network `shared-edge` (tạo 1 lần: `docker network create shared-edge`). Infra local có sẵn compose trong `docker/` (kafka, rabbitmq, mongodb, mariadb, redis-cluster, redis-sentinel, keycloak, postgres); riêng `docker/postgres` build image `base-postgres:16-vn-tz` để khôi phục alias timezone `Asia/Saigon` (postgres:16 đã bỏ, client gửi tên cũ sẽ bị từ chối kết nối).
 - **Definition of Done** cho mọi thay đổi:
   1. Thêm/sửa tính năng phải kèm test.
   2. `./mvnw clean test` xanh (JDK 25) trước khi báo hoàn thành — dẫn chứng bằng kết quả thật, không phỏng đoán.
   3. Mã/exception/status mới → cập nhật `AppCode`, `GlobalExceptionHandler`, i18n đồng bộ.
   4. Comment/tài liệu mới bằng tiếng Việt.
+  5. Thêm/sửa endpoint → export lại `postman/base-api-openapi.json` từ `/v3/api-docs` (file này KHÔNG tự đồng bộ).
