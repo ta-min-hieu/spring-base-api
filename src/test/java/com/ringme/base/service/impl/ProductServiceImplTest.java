@@ -28,7 +28,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -191,27 +190,25 @@ class ProductServiceImplTest {
     }
 
     @Test
-    void list_blankName_delegatesToFindAll() {
+    void list_blankNameAndCategory_normalizesToNullBeforeCallingSearch() {
         Pageable pageable = PageRequest.of(0, 10);
         Page<Product> page = new PageImpl<>(List.of());
-        when(productRepository.findAll(pageable)).thenReturn(page);
+        when(productRepository.search(null, null, null, pageable)).thenReturn(page);
 
-        service.list("  ", pageable);
+        service.list("  ", "  ", null, pageable);
 
-        verify(productRepository, times(1)).findAll(pageable);
-        verify(productRepository, never()).findByNameContainingIgnoreCase(any(), any());
+        verify(productRepository, times(1)).search(null, null, null, pageable);
     }
 
     @Test
-    void list_withName_delegatesToNameSearch() {
+    void list_withNameCategoryAndStatus_passesAllThreeFiltersToSearch() {
         Pageable pageable = PageRequest.of(0, 10);
         Page<Product> page = new PageImpl<>(List.of());
-        when(productRepository.findByNameContainingIgnoreCase(eq("ao"), eq(pageable))).thenReturn(page);
+        when(productRepository.search("ao", "clothes", ProductStatus.ACTIVE, pageable)).thenReturn(page);
 
-        service.list("ao", pageable);
+        service.list("ao", "clothes", ProductStatus.ACTIVE, pageable);
 
-        verify(productRepository, times(1)).findByNameContainingIgnoreCase("ao", pageable);
-        verify(productRepository, never()).findAll(pageable);
+        verify(productRepository, times(1)).search("ao", "clothes", ProductStatus.ACTIVE, pageable);
     }
 
     // ===== delete =====

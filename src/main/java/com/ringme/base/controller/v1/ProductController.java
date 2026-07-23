@@ -5,6 +5,7 @@ import com.ringme.base.dto.app.response.ProductResponse;
 import com.ringme.base.dto.app.response.common.Pagination;
 import com.ringme.base.dto.app.response.common.Response;
 import com.ringme.base.enums.AppCode;
+import com.ringme.base.enums.ProductStatus;
 import com.ringme.base.service.ProductService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -35,14 +36,17 @@ public class ProductController {
 
     private final ProductService productService;
 
-    @Operation(summary = "Danh sách sản phẩm", description = "Hỗ trợ tìm theo tên + phân trang")
+    @Operation(summary = "Danh sách sản phẩm",
+            description = "Hỗ trợ tìm theo tên + lọc theo category/status (đều tuỳ chọn, kết hợp AND) + phân trang")
     @GetMapping
     public Response<List<ProductResponse>> list(
             @RequestParam(required = false) String name,
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) ProductStatus status,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         Page<ProductResponse> result = productService.list(
-                name, PageRequest.of(page, size, Sort.by("id").descending()));
+                name, category, status, PageRequest.of(page, size, Sort.by("id").descending()));
 
         Pagination pagination = Pagination.builder()
                 .page(page)

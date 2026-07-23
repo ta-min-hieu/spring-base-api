@@ -7,6 +7,7 @@ import com.ringme.base.entity.Product;
 import com.ringme.base.entity.ProductUploadFile;
 import com.ringme.base.entity.UploadFile;
 import com.ringme.base.enums.AppCode;
+import com.ringme.base.enums.ProductStatus;
 import com.ringme.base.exception.BusinessLogicException;
 import com.ringme.base.repository.ProductRepository;
 import com.ringme.base.service.FileStorageService;
@@ -30,10 +31,10 @@ public class ProductServiceImpl implements ProductService {
     private final FileStorageService fileStorageService;
 
     @Override
-    public Page<ProductResponse> list(String name, Pageable pageable) {
-        Page<Product> page = (name == null || name.isBlank())
-                ? productRepository.findAll(pageable)
-                : productRepository.findByNameContainingIgnoreCase(name, pageable);
+    public Page<ProductResponse> list(String name, String category, ProductStatus status, Pageable pageable) {
+        String normalizedName = (name == null || name.isBlank()) ? null : name;
+        String normalizedCategory = (category == null || category.isBlank()) ? null : category;
+        Page<Product> page = productRepository.search(normalizedName, normalizedCategory, status, pageable);
         return page.map(this::toResponse);
     }
 

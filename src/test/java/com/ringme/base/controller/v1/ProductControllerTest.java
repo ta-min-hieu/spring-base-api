@@ -198,7 +198,7 @@ class ProductControllerTest {
 
     @Test
     void list_returnsPagedProductsWithMetadata() throws Exception {
-        when(productService.list(any(), eq(PageRequest.of(0, 10,
+        when(productService.list(any(), any(), any(), eq(PageRequest.of(0, 10,
                 org.springframework.data.domain.Sort.by("id").descending()))))
                 .thenReturn(new PageImpl<>(List.of(sampleResponse(1L))));
 
@@ -207,6 +207,21 @@ class ProductControllerTest {
                 .andExpect(jsonPath("$.data[0].id").value(1))
                 .andExpect(jsonPath("$.metadata.page").value(0))
                 .andExpect(jsonPath("$.metadata.size").value(10));
+    }
+
+    @Test
+    void list_forwardsCategoryAndStatusQueryParamsToService() throws Exception {
+        when(productService.list(eq("ao"), eq("clothes"), eq(ProductStatus.ACTIVE), any()))
+                .thenReturn(new PageImpl<>(List.of(sampleResponse(1L))));
+
+        mockMvc.perform(get("/v1/products")
+                        .param("name", "ao")
+                        .param("category", "clothes")
+                        .param("status", "active"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].id").value(1));
+
+        verify(productService, times(1)).list(eq("ao"), eq("clothes"), eq(ProductStatus.ACTIVE), any());
     }
 
     @Test
